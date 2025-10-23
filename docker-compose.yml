@@ -1,0 +1,115 @@
+services:
+  # Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+
+  # Local LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=/root/.ollama/models
+    restart: unless-stopped
+    # command: >
+    #   "ollama serve &
+    #    sleep 10 &&
+    #   #  ollama pull hf.co/Qwen/Qwen3-Embedding-0.6B-GGUF &&
+    #   #  ollama pull hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF &&
+    #   #  ollama pull hf.co/mradermacher/Qwen3-Reranker-0.6B-GGUF &&
+    #    wait"
+    # Uncomment deploy section below if GPU is available
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # # PostgreSQL Database
+  # postgres:
+  #   image: postgres:15
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_DB=sheikhgpt
+  #     - POSTGRES_USER=sheikhgpt
+  #     - POSTGRES_PASSWORD=sheikhgpt123
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+  # # Redis Cache
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+
+  # Main Application
+  # app:
+  #   build: 
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8003"
+  #   environment:
+  #     - DATABASE_URL=postgresql://sheikhgpt:sheikhgpt123@postgres:5432/sheikhgpt
+  #     - QDRANT_URL=http://qdrant:6333
+  #     - OLLAMA_URL=http://ollama:11434
+  #     - REDIS_URL=redis://redis:6379
+  #     - QWEN3_EMBEDDING_MODEL=qwen3-embedding:0.6b
+  #     - QWEN3_CHAT_MODEL=Qwen/Qwen3-8B-MLX-4bit # USE THIS ONE https://huggingface.co/Qwen/Qwen3-8B-MLX-4bit
+  #     - QWEN3_RERANKING_MODEL=qwen3-reranker:0.6b
+  #     - QWEN3_RERANK_WEIGHT=0.7
+  #     - QWEN3_MAX_SOURCES=10
+  #     - QWEN3_VECTOR_SIZE=768
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./logs:/app/logs
+  #   depends_on:
+  #     - qdrant
+  #     - postgres
+  #     - redis
+  #     - ollama
+  #   # restart: unless-stopped
+
+  # # Streamlit UI
+  # streamlit:
+  #   build: 
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   command: streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+  #   ports:
+  #     - "8501:8501"
+  #   environment:
+  #     - FASTAPI_URL=http://app:8000
+  #   volumes:
+  #     - ./streamlit_app.py:/app/streamlit_app.py
+  #     - ./ui:/app/ui
+  #     - ./.streamlit:/app/.streamlit
+  #     - ./data:/app/data
+  #     - ./logs:/app/logs
+  #   depends_on:
+  #     - app
+  #   # restart: unless-stopped
+
+volumes:
+  qdrant_storage:
+  ollama_storage:
+  postgres_data:
+  redis_data: 
