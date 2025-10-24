@@ -62,7 +62,7 @@ class RerankerService:
             Configured LLMRerank postprocessor
         """
         if self.reranker is None:
-            logger.info(f"📥 Creating LLMRerank with {self.llm_model}")
+            logger.info(f"Creating LLMRerank with {self.llm_model}")
             
             # Create Ollama LLM for reranking
             llm = Ollama(
@@ -79,7 +79,7 @@ class RerankerService:
                 choice_batch_size=self.choice_batch_size,
             )
             
-            logger.info(f"✅ LLMRerank ready")
+            logger.info(f"LLMRerank ready")
         
         return self.reranker
     
@@ -132,7 +132,7 @@ class RerankerService:
             )
             
             elapsed = time.time() - start_time
-            logger.info(f"✓ Reranked to top {len(reranked_nodes)} nodes in {elapsed:.2f}s")
+            logger.info(f"Reranked to top {len(reranked_nodes)} nodes in {elapsed:.2f}s")
             
             return reranked_nodes
             
@@ -188,72 +188,34 @@ class RerankerService:
             "top_node_preview": ranked_nodes[0].node.get_content()[:100] if ranked_nodes else ""
         }
         
-        logger.info("✓ Test successful!")
+        logger.info("Test successful!")
         logger.info(f"  Reranking time: {elapsed_time:.3f}s")
         logger.info(f"  Top node: {result['top_node_preview']}")
         
         return result
-    
-    def get_info(self) -> Dict[str, Any]:
-        """
-        Get information about the reranker configuration.
-        
-        Returns:
-            Dictionary with configuration info
-        """
-        return {
-            "backend": "llama_index_llm_rerank",
-            "llm_model": self.llm_model,
-            "top_n": self.top_n,
-            "choice_batch_size": self.choice_batch_size,
-            "ollama_url": config.OLLAMA_URL,
-            "reranker_loaded": self.reranker is not None
-        }
-    
-    def print_info(self):
-        """Print reranker configuration in a readable format."""
-        info = self.get_info()
-        print(f"\n{'='*60}")
-        print(f"Reranker Service Configuration")
-        print(f"{'='*60}")
-        print(f"Backend: {info['backend']}")
-        print(f"LLM Model: {info['llm_model']}")
-        print(f"Top N Results: {info['top_n']}")
-        print(f"Batch Size: {info['choice_batch_size']}")
-        print(f"Ollama URL: {info['ollama_url']}")
-        print(f"Reranker Loaded: {info['reranker_loaded']}")
-        print(f"{'='*60}\n")
 
 
 def main():
     """Main function to test the reranker service."""
-    print("="*70)
     print("Testing LlamaIndex LLMRerank with Ollama")
-    print("="*70)
-    print()
     
     # Initialize service
     service = RerankerService(top_n=2)
     
-    # Print configuration
-    service.print_info()
-    
     # Check availability
     if not service.check_availability():
-        print("❌ Reranker not available")
+        print("Reranker not available")
         return
     
-    print("✅ Reranker is available\n")
+    print("Reranker is available\n")
     
     # Run test
     result = service.test_reranking()
-    print(f"\nTest result:")
+    print(f"Test result:")
     for key, value in result.items():
         print(f"  {key}: {value}")
     
-    print("\n" + "="*70)
-    print("✅ Reranker test complete!")
-    print("="*70)
+    print("Reranker test complete!")
 
 
 if __name__ == "__main__":

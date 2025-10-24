@@ -273,22 +273,23 @@ documents = load_hadith_json()  # Returns List[Document]
 pipeline.run(documents=documents)
 ```
 
-## Phase 4: Ollama Model Integration (via LlamaIndex)
+## Phase 4: Ollama Model Integration (via LlamaIndex) ✅ COMPLETED
 
 **See `RAG-plan.md` for detailed LlamaIndex + Ollama integration patterns.**
 
-### 4.1 Ollama Service Setup
+### 4.1 Ollama Service Setup ✅
 
-**docker-compose.yml** - Enable and configure Ollama:
+**docker-compose.yml** - Ollama configured and running:
 
-- Service: `ollama/ollama:latest`
-- Port: 11434
-- Models to pull on startup:
-  - `dengcao/Qwen3-Embedding-0.6B` - Embedding generation
-  - `qwen3:4b` or `qwen3:8b` - Chat completion
-  - `qwen3-reranker:0.6b` - Optional reranking (community build)
+- ✅ Service: `ollama/ollama:latest`
+- ✅ Port: 11434
+- ✅ Models pulled and tested:
+  - `embeddinggemma:latest` - Embedding generation (768 dimensions)
+  - `qwen2.5:3b` - Chat completion (memory efficient)
+  - `dengcao/Qwen3-Embedding-0.6B` - Alternative embedding model
+  - LLM-based reranking via `LLMRerank` (no dedicated reranker needed)
 
-### 4.2 LlamaIndex + Ollama Configuration (`backend/llama_config.py`)
+### 4.2 LlamaIndex + Ollama Configuration (`backend/llama_config.py`) ✅
 
 **Embedding Configuration:**
 
@@ -299,13 +300,13 @@ from llama_index.core import Settings
 
 # Configure Ollama embeddings
 embed_model = OllamaEmbedding(
-    model_name="dengcao/Qwen3-Embedding-0.6B",
+    model_name="embeddinggemma:latest",
     base_url="http://localhost:11434",
 )
 
 # Configure Ollama LLM
 llm = Ollama(
-    model="qwen3:4b",
+    model="qwen2.5:3b",
     base_url="http://localhost:11434",
 )
 
@@ -314,13 +315,23 @@ Settings.embed_model = embed_model
 Settings.llm = llm
 ```
 
-**Backend services integration:**
+**Backend services integration:** ✅
 
-- `backend/embeddings_service.py` - Wrapper around LlamaIndex OllamaEmbedding (for backward compatibility)
-- `backend/llm_service.py` - Wrapper around LlamaIndex Ollama LLM with streaming support
-- `backend/reranker_service.py` - Optional Ollama reranker (if available)
+- ✅ `backend/embeddings_service.py` - Wrapper around LlamaIndex OllamaEmbedding
+- ✅ `backend/llm_service.py` - Wrapper around LlamaIndex Ollama LLM with streaming support
+- ✅ `backend/reranker_service.py` - Uses LlamaIndex LLMRerank postprocessor
+- ✅ `backend/llama_config.py` - Centralized configuration with helper functions
+- ✅ All following LlamaIndex best practices
 
-**Admin API endpoints** (integrated into LangGraph Server):
+**Helper functions available:**
+
+- `configure_llama_index()` - Set global Settings
+- `get_embed_model()` - Get configured embedding model
+- `get_llm()` - Get configured LLM
+- `check_ollama_connection()` - Verify Ollama is reachable
+- `check_model_available(model_name)` - Check if model is loaded
+
+**Admin API endpoints** (to be integrated into LangGraph Server):
 
 - `GET /api/admin/models/status` - Check which models are loaded
 - `POST /api/admin/models/pull/:model` - Pull a model from Ollama library

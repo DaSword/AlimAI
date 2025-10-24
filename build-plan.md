@@ -70,47 +70,67 @@ None - this is the foundation for all other stages. -->
 
 ---
 
-## Stage 3: Ollama Integration & Model Setup
+<!-- ## Stage 3: Ollama Integration & Model Setup ✅ COMPLETED
 
 **Goal:** Replace sentence-transformers with Ollama-based embedding service and set up LLM.
 
 ### Tasks
 
 #### Technical
-- [ ] Create `backend/embeddings_service.py` with Ollama API client
-  - Implement `/api/embeddings` endpoint integration
-  - Support batch embedding generation
-  - Maintain interface compatibility with old `EmbeddingsManager`
-- [ ] Create `backend/llm_service.py` for chat completions
-  - Implement `/api/generate` or `/api/chat` endpoint
-  - Support streaming responses
-  - Handle context window management
-- [ ] Create `backend/reranker_service.py` (optional)
-  - Implement reranker model integration
-  - Fallback to semantic similarity
-- [ ] Update `docker-compose.yml` startup script to pull models
+- [x] Create `backend/embeddings_service.py` with Ollama via LlamaIndex
+  - ✅ Uses LlamaIndex `OllamaEmbedding` wrapper
+  - ✅ Support batch embedding generation
+  - ✅ Maintains interface compatibility with old `EmbeddingsManager`
+  - ✅ Fallback to sentence-transformers if needed
+- [x] Create `backend/llm_service.py` for chat completions
+  - ✅ Uses LlamaIndex `Ollama` LLM wrapper
+  - ✅ Support streaming responses
+  - ✅ Handle context window management
+  - ✅ Graceful error handling for memory constraints
+- [x] Create `backend/reranker_service.py`
+  - ✅ Uses LlamaIndex `LLMRerank` postprocessor
+  - ✅ LLM-based reranking following LlamaIndex best practices
+  - ✅ Graceful fallback when memory limited
+- [x] Create `backend/llama_config.py`
+  - ✅ Centralized LlamaIndex configuration
+  - ✅ Helper functions for getting LLM and embeddings
+  - ✅ Model availability checking utilities
+- [x] Update `docker-compose.yml` with Ollama service
 
 #### Non-Technical
-- [ ] Download and test Ollama models:
-  - `dengcao/Qwen3-Embedding-0.6B` (embedding)
-  - `qwen3:4b` or `qwen3:8b` (chat)
-  - Optional: `qwen3-reranker:0.6b` (reranking)
+- [x] Download and test Ollama models:
+  - ✅ `nomic-embed-text:latest` (embedding - 768 dimensions)
+  - ✅ `qwen2.5:3b` (chat - memory efficient)
+  - ✅ `embeddinggemma:latest` (alternative embedding model)
+  - ✅ Tested reranking with LLM (no dedicated reranker needed)
 
 ### Deliverables
-- Ollama-based embedding service
-- Ollama-based LLM service
-- Models downloaded and ready to use
+- ✅ `backend/embeddings_service.py` - LlamaIndex OllamaEmbedding wrapper
+- ✅ `backend/llm_service.py` - LlamaIndex Ollama LLM wrapper  
+- ✅ `backend/reranker_service.py` - LlamaIndex LLMRerank implementation
+- ✅ `backend/llama_config.py` - LlamaIndex global configuration
+- ✅ `example_chat.py` - Demonstrates Chat Engines usage
+- ✅ Models downloaded and tested
 
 ### Acceptance Criteria
-- [ ] `embeddings_service.py` generates embeddings via Ollama API
-- [ ] Embedding generation completes in reasonable time (<5s for 100 texts)
-- [ ] `llm_service.py` generates chat completions via Ollama
-- [ ] All models load successfully on `docker-compose up`
-- [ ] Backward compatibility: existing Quran embeddings still work
+- [x] `embeddings_service.py` generates embeddings via Ollama API
+- [x] Embedding generation completes in reasonable time (<5s for 100 texts)
+- [x] `llm_service.py` generates chat completions via Ollama
+- [x] All models load successfully on `docker-compose up`
+- [x] Reranker uses LlamaIndex LLMRerank following best practices
+- [x] All services follow LlamaIndex patterns and conventions
+- [x] Graceful fallback handling for memory constraints
+- [x] Backward compatibility maintained
 
 ### Dependencies
-- Stage 1 (Ollama service running)
-- Stage 2 (backend structure in place)
+- Stage 1 (Ollama service running) ✅
+- Stage 2 (backend structure in place) ✅
+
+### Notes
+- Using `embeddinggemma:latest` instead of Qwen embedding (better performance)
+- Using `qwen2.5:3b` instead of `qwen3:4b` (more memory efficient)
+- Reranker uses LLM-based approach via `LLMRerank`
+- All implementations follow LlamaIndex official documentation and examples -->
 
 ---
 
@@ -482,12 +502,12 @@ None - this is the foundation for all other stages. -->
 ## Progress Tracking
 
 ### Current Stage
-**Stage 1** - Environment Setup & Infrastructure
+**Stage 4** - Enhanced Data Schema & Ingestion Pipeline (LlamaIndex)
 
 ### Completion Status
-- [ ] Stage 1: Environment Setup & Infrastructure
-- [ ] Stage 2: Backend Core Structure
-- [ ] Stage 3: Ollama Integration & Model Setup
+- [x] Stage 1: Environment Setup & Infrastructure ✅
+- [x] Stage 2: Backend Core Structure ✅
+- [x] Stage 3: Ollama Integration & Model Setup ✅
 - [ ] Stage 4: Enhanced Data Schema & Ingestion Pipeline
 - [ ] Stage 5: RAG Retrieval System
 - [ ] Stage 6: Frontend Development

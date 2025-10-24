@@ -94,7 +94,7 @@ class LLMService:
         """
         try:
             
-            logger.info(f"📥 Loading Ollama LLM: {self.model_name}")
+            logger.info(f"Loading Ollama LLM: {self.model_name}")
             
             # Build kwargs for Ollama
             kwargs = {
@@ -111,15 +111,15 @@ class LLMService:
             
             self.ollama_llm = Ollama(**kwargs)
             
-            logger.info(f"✅ Ollama LLM loaded successfully")
+            logger.info(f"Ollama LLM loaded successfully")
             return True
             
         except ImportError:
-            logger.error("✗ llama-index-llms-ollama not installed")
+            logger.error("llama-index-llms-ollama not installed")
             logger.error("  Install with: pip install llama-index-llms-ollama")
             return False
         except Exception as e:
-            logger.error(f"✗ Failed to load Ollama LLM: {str(e)}")
+            logger.error(f"Failed to load Ollama LLM: {str(e)}")
             logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
             logger.error(f"  And model '{self.model_name}' is available")
             return False
@@ -207,7 +207,7 @@ class LLMService:
                 generation_time=elapsed_time
             )
             
-            logger.info(f"✓ Generated response in {elapsed_time:.2f}s")
+            logger.info(f"Generated response in {elapsed_time:.2f}s")
             
             return chat_response
             
@@ -344,22 +344,17 @@ def main():
     # Initialize service
     service = LLMService(temperature=0.7)
     
-    # Print configuration
-    service.print_info()
-    
     # Check model availability
     if not service.check_model_availability():
-        print("❌ Failed to load LLM model")
+        print("Failed to load LLM model")
         return
     
     # Run test
     result = service.test_chat()
-    print(f"\nTest result: {result}")
+    print(f"Test result: {result}")
     
     # Test streaming
-    print("\n" + "="*60)
     print("Testing streaming chat...")
-    print("="*60)
     
     test_message = "Briefly explain the concept of Tawhid in Islam."
     print(f"Message: {test_message}\n")
@@ -368,7 +363,6 @@ def main():
     for chunk in service.stream_chat(test_message):
         print(chunk, end="", flush=True)
     
-    print("\n" + "="*60)
 
 
 if __name__ == "__main__":

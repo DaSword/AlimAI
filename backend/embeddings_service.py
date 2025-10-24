@@ -52,7 +52,7 @@ class EmbeddingsService:
         try:
             from llama_index.embeddings.ollama import OllamaEmbedding
             
-            logger.info(f"📥 Loading Ollama embedding model: {self.model_name}")
+            logger.info(f"Loading Ollama embedding model: {self.model_name}")
             
             self.ollama_embedding = OllamaEmbedding(
                 model_name=self.model_name,
@@ -64,16 +64,16 @@ class EmbeddingsService:
             test_embedding = self.ollama_embedding.get_text_embedding("test")
             self.vector_size = len(test_embedding)
             
-            logger.info(f"✅ Ollama embedding model loaded successfully")
-            logger.info(f"📐 Vector dimensions: {self.vector_size}")
+            logger.info(f"Ollama embedding model loaded successfully")
+            logger.info(f"Vector dimensions: {self.vector_size}")
             return True
             
         except ImportError:
-            logger.error("✗ llama-index-embeddings-ollama not installed")
+            logger.error("llama-index-embeddings-ollama not installed")
             logger.error("  Install with: pip install llama-index-embeddings-ollama")
             return False
         except Exception as e:
-            logger.error(f"✗ Failed to load Ollama embedding model: {str(e)}")
+            logger.error(f"Failed to load Ollama embedding model: {str(e)}")
             logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
             logger.error(f"  And model '{self.model_name}' is available")
             return False
@@ -190,7 +190,7 @@ class EmbeddingsService:
                 "sample_values": embedding[:5]  # First 5 values
             }
             
-            logger.info("✓ Test successful!")
+            logger.info("Test successful!")
             logger.info(f"  Vector size: {len(embedding)}")
             logger.info(f"  Generation time: {elapsed_time:.3f}s")
             logger.info(f"  Sample values: {embedding[:5]}")
@@ -200,23 +200,9 @@ class EmbeddingsService:
                 "model": self.model_name,
                 "error": "Failed to generate embedding"
             }
-            logger.error("✗ Test failed!")
+            logger.error("Test failed!")
         
         return result
-    
-    def get_info(self) -> Dict[str, Any]:
-        """
-        Get information about the embeddings configuration.
-        
-        Returns:
-            Dictionary with configuration info
-        """
-        return {
-            "model_name": self.model_name,
-            "vector_size": self.vector_size,
-            "ollama_loaded": self.ollama_embedding is not None,
-            "ollama_url": config.OLLAMA_URL
-        }
 
 
 # Backward compatibility alias
@@ -228,20 +214,17 @@ def main():
     # Initialize service
     service = EmbeddingsService()
     
-    # Print configuration
-    service.print_info()
-    
     # Check model availability
     if not service.check_model_availability():
-        print("❌ Failed to load any embedding model")
+        print("Failed to load any embedding model")
         return
     
     # Run test
     result = service.test_embedding()
-    print(f"\nTest result: {result}")
+    print(f"Test result: {result}")
     
     # Test batch embeddings
-    print("\nTesting batch embeddings...")
+    print("Testing batch embeddings...")
     texts = [
         "Bismillah ar-Rahman ar-Rahim",
         "بسم الله الرحمن الرحيم",
