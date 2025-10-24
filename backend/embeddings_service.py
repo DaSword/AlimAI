@@ -1,19 +1,16 @@
 """
 Embeddings Service - Generate text embeddings for Islamic texts.
 
-This module provides a wrapper around sentence-transformers for backward compatibility
-and will be updated to use Ollama via LlamaIndex in Stage 3.
+This module provides a wrapper around LlamaIndex's OllamaEmbedding for generating
+embeddings via Ollama
 
-Migrated from embeddings_manager.py with updated imports for backend structure.
+Updated in Stage 3 to use Ollama via LlamaIndex.
 """
 
 import time
 from typing import List, Dict, Any, Optional
 
-from sentence_transformers import SentenceTransformer
-
-# Updated imports for backend structure
-from backend.config import Config
+from backend.config import config
 from backend.utils import setup_logging
 
 logger = setup_logging("embeddings_service")
@@ -21,58 +18,74 @@ logger = setup_logging("embeddings_service")
 
 class EmbeddingsService:
     """
-    Service class for generating text embeddings.
+    Service class for generating text embeddings using Ollama via LlamaIndex.
     
-    Currently uses sentence-transformers. Will be updated in Stage 3 to use
-    Ollama embeddings via LlamaIndex (OllamaEmbedding).
+    Uses LlamaIndex's OllamaEmbedding for primary embedding generation.
+
     """
     
-    def __init__(self, model_name: str = None):
+    def __init__(
+        self,
+        model_name: Optional[str] = None,
+    ):
         """
         Initialize EmbeddingsService.
         
         Args:
             model_name: Embedding model name (defaults to config)
         """
-        # Use SentenceTransformer with Qwen3 model from HuggingFace
-        self.model_name = model_name or Config.EMBEDDING_MODEL
-        self.embedding_model = None  # Will be initialized in check_model_availability
-        self.vector_size = None  # Will be detected from model
+        self.model_name = model_name or config.OLLAMA_EMBEDDING_MODEL
+        self.ollama_embedding = None
+        self.vector_size = None
         
-        logger.info(f"Initialized EmbeddingsService with model: {self.model_name}")
+        logger.info(f"Initialized EmbeddingsService")
         
-    def _load_model(self) -> bool:
+        self._load_ollama_embedding()
+
+    def _load_ollama_embedding(self) -> bool:
         """
-        Load the embedding model.
+        Load the Ollama embedding model via LlamaIndex.
         
         Returns:
             True if model loaded successfully, False otherwise
         """
         try:
-            logger.info(f"📥 Loading embedding model: {self.model_name}")
-            self.embedding_model = SentenceTransformer(self.model_name)
+            from llama_index.embeddings.ollama import OllamaEmbedding
             
-            # Detect vector dimensions
-            test_embedding = self.embedding_model.encode("test", convert_to_numpy=True)
+            logger.info(f"📥 Loading Ollama embedding model: {self.model_name}")
+            
+            self.ollama_embedding = OllamaEmbedding(
+                model_name=self.model_name,
+                base_url=config.OLLAMA_URL,
+                request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
+            )
+            
+            # Test embedding to detect vector dimensions
+            test_embedding = self.ollama_embedding.get_text_embedding("test")
             self.vector_size = len(test_embedding)
             
-            logger.info(f"✅ Embedding model loaded successfully")
+            logger.info(f"✅ Ollama embedding model loaded successfully")
             logger.info(f"📐 Vector dimensions: {self.vector_size}")
             return True
+            
+        except ImportError:
+            logger.error("✗ llama-index-embeddings-ollama not installed")
+            logger.error("  Install with: pip install llama-index-embeddings-ollama")
+            return False
         except Exception as e:
-            logger.error(f"✗ Failed to load embedding model: {str(e)}")
+            logger.error(f"✗ Failed to load Ollama embedding model: {str(e)}")
+            logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
+            logger.error(f"  And model '{self.model_name}' is available")
             return False
     
     def check_model_availability(self) -> bool:
         """
-        Check if the embedding model can be loaded.
+        Check if an embedding model can be loaded.
         
         Returns:
             True if model is available, False otherwise
         """
-        if self.embedding_model is None:
-            return self._load_model()
-        return True
+        return self.ollama_embedding is not None
     
     def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -88,19 +101,15 @@ class EmbeddingsService:
             logger.warning("Empty text provided for embedding")
             return None
         
-        # Ensure model is loaded
-        if self.embedding_model is None:
-            if not self._load_model():
-                return None
+        # Ensure a model is loaded
+        if not self.check_model_availability():
+            logger.error("No embedding model available")
+            return None
         
         try:
-            # Generate embedding using SentenceTransformer
-            embedding = self.embedding_model.encode(
-                text.strip(),
-                convert_to_numpy=True,
-                show_progress_bar=False
-            )
-            return embedding.tolist()
+            embedding = self.ollama_embedding.get_text_embedding(text.strip())
+            return embedding
+            
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
             return None
@@ -108,24 +117,22 @@ class EmbeddingsService:
     def generate_embeddings_batch(
         self, 
         texts: List[str],
-        batch_delay: float = 0.1,
         show_progress: bool = True
     ) -> List[Optional[List[float]]]:
         """
-        Generate embeddings for multiple texts efficiently using batch encoding.
+        Generate embeddings for multiple texts efficiently.
         
         Args:
             texts: List of texts to embed
-            batch_delay: Delay between batches (unused, kept for compatibility)
             show_progress: Whether to show progress updates
             
         Returns:
             List of embedding vectors (None for failed embeddings)
         """
-        # Ensure model is loaded
-        if self.embedding_model is None:
-            if not self._load_model():
-                return [None] * len(texts)
+        # Ensure a model is loaded
+        if not self.check_model_availability():
+            logger.error("No embedding model available")
+            return [None] * len(texts)
         
         total = len(texts)
         
@@ -133,13 +140,26 @@ class EmbeddingsService:
             logger.info(f"Generating embeddings for {total} texts...")
         
         try:
-            embeddings = self.embedding_model.encode(
-                texts,
-                convert_to_numpy=True,
-                show_progress_bar=show_progress
-            )
-            # Convert numpy arrays to lists for JSON serialization
-            return [embedding.tolist() for embedding in embeddings]
+            # LlamaIndex OllamaEmbedding doesn't have batch method exposed,
+            # so we'll process in batches manually
+            embeddings = []
+            batch_size = config.OLLAMA_EMBEDDING_BATCH_SIZE
+            
+            for i in range(0, total, batch_size):
+                batch = texts[i:i + batch_size]
+                
+                if show_progress:
+                    logger.info(f"Processing batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size}")
+                
+                # Get embeddings for batch
+                batch_embeddings = [
+                    self.ollama_embedding.get_text_embedding(text.strip())
+                    for text in batch if text and text.strip()
+                ]
+                embeddings.extend(batch_embeddings)
+            
+            return embeddings
+        
         except Exception as e:
             logger.error(f"Error generating batch embeddings: {str(e)}")
             return [None] * total
@@ -166,7 +186,6 @@ class EmbeddingsService:
                 "success": True,
                 "model": self.model_name,
                 "vector_size": len(embedding),
-                "expected_vector_size": self.vector_size,
                 "generation_time": round(elapsed_time, 3),
                 "sample_values": embedding[:5]  # First 5 values
             }
@@ -195,35 +214,9 @@ class EmbeddingsService:
         return {
             "model_name": self.model_name,
             "vector_size": self.vector_size,
-            "model_loaded": self.embedding_model is not None
+            "ollama_loaded": self.ollama_embedding is not None,
+            "ollama_url": config.OLLAMA_URL
         }
-    
-    def print_info(self):
-        """Print embeddings configuration in a readable format."""
-        info = self.get_info()
-        print(f"\n{'='*60}")
-        print(f"Embeddings Service Configuration")
-        print(f"{'='*60}")
-        print(f"Model: {info['model_name']}")
-        print(f"Vector Size: {info['vector_size']}")
-        print(f"Model Loaded: {info['model_loaded']}")
-        print(f"{'='*60}\n")
-
-    def cosine_similarity(self, vector1: List[float], vector2: List[float]) -> float:
-        """
-        Calculate cosine similarity between two vectors.
-        
-        Args:
-            vector1: First vector
-            vector2: Second vector
-            
-        Returns:
-            Cosine similarity score
-        """
-        if self.embedding_model is None:
-            raise RuntimeError("Embedding model not loaded")
-        
-        return self.embedding_model.similarity(vector1, vector2)
 
 
 # Backward compatibility alias
@@ -239,18 +232,24 @@ def main():
     service.print_info()
     
     # Check model availability
-    service.check_model_availability()
+    if not service.check_model_availability():
+        print("❌ Failed to load any embedding model")
+        return
     
     # Run test
-    service.test_embedding()
-
-    # Test cosine similarity
-    vector1 = service.generate_embedding("Bismillah ar-Rahman ar-Rahim")
-    vector2 = service.generate_embedding("بسم الله الرحمن الرحيم")
-    similarity = service.cosine_similarity(vector1, vector2)
-    print(f"Cosine similarity: {similarity}")
+    result = service.test_embedding()
+    print(f"\nTest result: {result}")
+    
+    # Test batch embeddings
+    print("\nTesting batch embeddings...")
+    texts = [
+        "Bismillah ar-Rahman ar-Rahim",
+        "بسم الله الرحمن الرحيم",
+        "In the name of Allah, the Most Gracious, the Most Merciful"
+    ]
+    embeddings = service.generate_embeddings_batch(texts, show_progress=True)
+    print(f"Generated {len([e for e in embeddings if e])} embeddings successfully")
 
 
 if __name__ == "__main__":
     main()
-

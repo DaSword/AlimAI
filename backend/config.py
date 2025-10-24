@@ -24,12 +24,13 @@ class Config:
     # Ollama Configuration
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     OLLAMA_EMBEDDING_MODEL: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "embeddinggemma")
-    OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:8b")
-    OLLAMA_RERANKER_MODEL: Optional[str] = os.getenv("OLLAMA_RERANKER_MODEL", None)
-    
-    # Embedding Configuration (for sentence-transformers fallback)
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B-GGUF")
-    VECTOR_SIZE: int = int(os.getenv("VECTOR_SIZE", "1024"))
+    OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5:3b")
+    OLLAMA_RERANKER_MODEL: Optional[str] = os.getenv("OLLAMA_RERANKER_MODEL", "dengcao/Qwen3-Reranker-0.6B:Q8_0")
+    OLLAMA_MAX_TOKENS: int = int(os.getenv("OLLAMA_MAX_TOKENS", "1000"))
+
+    # Ollama Model Configuration
+    OLLAMA_REQUEST_TIMEOUT: int = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "30"))
+    OLLAMA_EMBEDDING_BATCH_SIZE: int = int(os.getenv("OLLAMA_EMBEDDING_BATCH_SIZE", "5"))
     
     # RAG Configuration
     MAX_SOURCES: int = int(os.getenv("MAX_SOURCES", "10"))
