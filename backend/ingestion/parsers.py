@@ -12,7 +12,7 @@ Each parser extends LlamaIndex's NodeParser base class and creates properly
 structured nodes with metadata following our universal schema.
 """
 
-from typing import List, Dict, Any, Optional, Sequence
+from typing import List, Dict, Any, Sequence
 from llama_index.core.node_parser import NodeParser
 from llama_index.core.schema import Document, TextNode, NodeRelationship, RelatedNodeInfo
 from llama_index.core.utils import get_tqdm_iterable

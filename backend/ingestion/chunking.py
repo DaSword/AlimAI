@@ -441,7 +441,7 @@ def main():
     verse_chunks = [c for c in chunks if c['chunk_type'] == 'verse']
     tafsir_chunks = [c for c in chunks if c['chunk_type'] == 'tafsir']
     
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Total chunks: {len(chunks)}")
     print(f"  Verse chunks: {len(verse_chunks)}")
     print(f"  Tafsir chunks: {len(tafsir_chunks)}")

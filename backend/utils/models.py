@@ -8,7 +8,7 @@ This module defines data models for:
 - Qdrant payloads
 """
 
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from enum import Enum

@@ -49,7 +49,7 @@ class RerankerService:
         self.choice_batch_size = choice_batch_size
         self.reranker = None
         
-        logger.info(f"Initialized RerankerService")
+        logger.info("Initialized RerankerService")
         logger.info(f"  LLM Model: {self.llm_model}")
         logger.info(f"  Top N: {self.top_n}")
         logger.info(f"  Batch Size: {self.choice_batch_size}")
@@ -79,7 +79,7 @@ class RerankerService:
                 choice_batch_size=self.choice_batch_size,
             )
             
-            logger.info(f"LLMRerank ready")
+            logger.info("LLMRerank ready")
         
         return self.reranker
     
@@ -211,7 +211,7 @@ def main():
     
     # Run test
     result = service.test_reranking()
-    print(f"Test result:")
+    print("Test result:")
     for key, value in result.items():
         print(f"  {key}: {value}")
     

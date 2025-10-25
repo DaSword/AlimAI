@@ -4,7 +4,7 @@ LLM Service - Simplified wrapper for Ollama LLM via LlamaIndex.
 """
 
 import time
-from typing import List, Dict, Any, Optional, Iterator
+from typing import List, Optional, Iterator
 from dataclasses import dataclass
 
 from llama_index.llms.ollama import Ollama
@@ -69,7 +69,7 @@ class LLMService:
         self.system_prompt = system_prompt
         self.ollama_llm = None
         
-        logger.info(f"Initialized LLMService")
+        logger.info("Initialized LLMService")
         logger.info(f"  Model: {self.model_name}")
         logger.info(f"  Temperature: {self.temperature}")
         logger.info(f"  Max Tokens: {self.max_tokens or 'unlimited'}")
@@ -111,7 +111,7 @@ class LLMService:
             
             self.ollama_llm = Ollama(**kwargs)
             
-            logger.info(f"Ollama LLM loaded successfully")
+            logger.info("Ollama LLM loaded successfully")
             return True
             
         except ImportError:
@@ -213,8 +213,8 @@ class LLMService:
             
         except Exception as e:
             logger.error(f"Error generating chat completion: {str(e)}")
-            logger.error(f"  This might be due to insufficient memory for the model")
-            logger.error(f"  Consider using a smaller model or increase available memory")
+            logger.error("  This might be due to insufficient memory for the model")
+            logger.error("  Consider using a smaller model or increase available memory")
             return None
     
     def stream_chat(

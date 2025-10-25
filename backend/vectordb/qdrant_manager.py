@@ -14,12 +14,11 @@ import requests
 from llama_index.core import VectorStoreIndex, StorageContext
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams
 
 # Updated imports for backend structure
 from backend.core.config import Config
 from backend.core.utils import ProgressTracker, setup_logging
-from backend.core.models import QdrantPayload, SourceType
 
 logger = setup_logging("qdrant_manager")
 

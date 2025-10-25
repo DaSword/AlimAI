@@ -38,7 +38,7 @@ class EmbeddingsService:
         self.ollama_embedding = None
         self.vector_size = None
         
-        logger.info(f"Initialized EmbeddingsService")
+        logger.info("Initialized EmbeddingsService")
         
         self._load_ollama_embedding()
 
@@ -64,7 +64,7 @@ class EmbeddingsService:
             test_embedding = self.ollama_embedding.get_text_embedding("test")
             self.vector_size = len(test_embedding)
             
-            logger.info(f"Ollama embedding model loaded successfully")
+            logger.info("Ollama embedding model loaded successfully")
             logger.info(f"Vector dimensions: {self.vector_size}")
             return True
             

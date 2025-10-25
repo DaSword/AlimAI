@@ -23,7 +23,6 @@ from pathlib import Path
 from datetime import datetime
 from llama_index.core import Document
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import NodeParser
 
 from backend.core.config import Config
 from backend.core.models import SourceType
@@ -342,7 +341,7 @@ class IngestionManager:
             "success": True,
         }
         
-        logger.info(f"Ingestion complete:")
+        logger.info("Ingestion complete:")
         logger.info(f"  - Documents: {len(documents)}")
         logger.info(f"  - Nodes: {total_nodes}")
         logger.info(f"  - Time: {elapsed_time:.2f}s")
@@ -402,7 +401,7 @@ class IngestionManager:
         total_nodes = sum(r.get('total_nodes', 0) for r in results if r.get('success', False))
         
         logger.info(f"\n{'='*60}")
-        logger.info(f"Directory Ingestion Summary")
+        logger.info("Directory Ingestion Summary")
         logger.info(f"{'='*60}")
         logger.info(f"Files processed: {len(json_files)}")
         logger.info(f"Successful: {successful}")
