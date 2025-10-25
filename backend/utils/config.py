@@ -32,6 +32,9 @@ class Config:
     OLLAMA_REQUEST_TIMEOUT: int = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "30"))
     OLLAMA_EMBEDDING_BATCH_SIZE: int = int(os.getenv("OLLAMA_EMBEDDING_BATCH_SIZE", "5"))
     
+    # Vector Configuration
+    VECTOR_SIZE: int = int(os.getenv("VECTOR_SIZE", "768"))  # embeddinggemma default
+    
     # RAG Configuration
     MAX_SOURCES: int = int(os.getenv("MAX_SOURCES", "10"))
     RERANK_WEIGHT: float = float(os.getenv("RERANK_WEIGHT", "0.7"))

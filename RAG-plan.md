@@ -6,55 +6,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 1: Universal Schema Design & Migration
-
-**Goal:** Design extensible schema for all Islamic source types and migrate existing Quran data.
-
-### Tasks
-
-1. **Design Universal Schema** (`backend/schemas.py`)
-
-   - Core fields: `source_type`, `book_title`, `author`, `text_content`, `arabic_text`, `english_text`, `topic_tags`
-   - Nested `source_metadata` for source-specific fields (hadith_number, verse_key, madhab, authenticity_grade, etc.)
-   - `references` object for cross-references
-   - Compatible with LlamaIndex Document metadata structure
-
-2. **Create Schema Documentation** (`docs/SCHEMA.md`)
-
-   - Document all fields and their purposes
-   - Provide examples for each source type
-   - Include Qdrant payload structure
-
-3. **Build Migration Script** (`backend/migration/migrate_quran.py`)
-
-   - Read existing Quran data from Qdrant export (`data/islamic_knowledge.json`)
-   - Transform to new universal schema format
-   - Add missing fields: `source_type="quran"`, `book_title`, `author`, `topic_tags`
-   - Preserve existing embeddings (no re-embedding needed)
-   - Save to new JSON format for re-ingestion
-
-4. **Update Qdrant Manager** (`backend/qdrant_manager.py`)
-
-   - Refactor to support new schema
-   - Add methods for filtered searches by source_type, metadata fields
-   - Ensure backward compatibility during migration
-
-### Deliverables
-
-- Universal schema definition in `backend/schemas.py`
-- Schema documentation in `docs/SCHEMA.md`
-- Migration script for existing Quran data
-- Updated `backend/qdrant_manager.py`
-
-### Acceptance Criteria
-
-- Schema supports all source types (Quran, Hadith, Tafsir, Fiqh, Seerah, Aqidah) without sparse fields
-- Migration script successfully transforms existing Quran data
-- Can filter Qdrant queries by `source_type` and nested metadata
-
----
-
-## Phase 2: Ollama Integration & LlamaIndex Setup ✅ COMPLETED
+## Phase 1: Ollama Integration & LlamaIndex Setup ✅ COMPLETED
 
 **Goal:** Set up Ollama for embeddings, configure LlamaIndex with Qdrant integration.
 
@@ -137,7 +89,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 3: Custom NodeParsers for Multi-Source Ingestion
+## Phase 2: Custom NodeParsers for Multi-Source Ingestion
 
 **Goal:** Create LlamaIndex NodeParsers for each Islamic text type with proper metadata extraction.
 
@@ -201,7 +153,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 4: Universal Ingestion Pipeline
+## Phase 3: Universal Ingestion Pipeline
 
 **Goal:** Build LlamaIndex IngestionPipeline to process all Islamic text types.
 
@@ -255,7 +207,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 5: LangGraph Workflow Design
+## Phase 4: LangGraph Workflow Design
 
 **Goal:** Build intelligent RAG workflow with query classification, retrieval, ranking, and generation.
 
@@ -322,7 +274,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 6: Multi-Source Retrieval Strategy
+## Phase 5: Multi-Source Retrieval Strategy
 
 **Goal:** Implement intelligent retrieval that adapts to query type and source characteristics.
 
@@ -382,7 +334,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 7: LangGraph Server Setup
+## Phase 6: LangGraph Server Setup
 
 **Goal:** Deploy LangGraph Server with RAG workflow, admin endpoints, and streaming support.
 
@@ -456,7 +408,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 8: Testing & Refinement
+## Phase 7: Testing & Refinement
 
 **Goal:** Test end-to-end RAG pipeline with diverse Islamic queries and refine for quality.
 
@@ -516,7 +468,7 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ---
 
-## Phase 9: Documentation & Finalization
+## Phase 8: Documentation & Finalization
 
 **Goal:** Complete documentation and ensure system is production-ready.
 
@@ -573,15 +525,14 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 
 ## Implementation Order
 
-1. **Phase 1** - Schema Design (foundational, blocks everything else)
-2. **Phase 2** - Ollama + LlamaIndex Setup (required for ingestion)
-3. **Phase 3** - NodeParsers (required for ingestion)
-4. **Phase 4** - Ingestion Pipeline (get data into system)
-5. **Phase 5** - LangGraph Workflow (RAG logic)
-6. **Phase 6** - Multi-Source Retrieval (intelligent querying)
-7. **Phase 7** - LangGraph Server (deployment)
-8. **Phase 8** - Testing & Refinement (quality assurance)
-9. **Phase 9** - Documentation (finalization)
+1. **Phase 1** - Ollama + LlamaIndex Setup (required for ingestion)
+2. **Phase 2** - NodeParsers (required for ingestion)
+3. **Phase 3** - Ingestion Pipeline (get data into system)
+4. **Phase 4** - LangGraph Workflow (RAG logic)
+5. **Phase 5** - Multi-Source Retrieval (intelligent querying)
+6. **Phase 6** - LangGraph Server (deployment)
+7. **Phase 7** - Testing & Refinement (quality assurance)
+8. **Phase 8** - Documentation (finalization)
 
 ---
 
@@ -603,20 +554,9 @@ Build a production-ready RAG system using **LangGraph Server** (orchestration) +
 ## Success Metrics
 
 ### Completed ✅
-- ✅ **Phase 2 Complete**: Ollama integration with LlamaIndex
-- ✅ Ollama embeddings working via `nomic-embed-text:latest`
+- ✅ **Phase 1 Complete**: Ollama integration with LlamaIndex
+- ✅ Ollama embeddings working via `embeddinggemma:latest`
 - ✅ LLM service operational via `qwen2.5:3b`
 - ✅ Reranker service using LlamaIndex `LLMRerank`
 - ✅ All services follow LlamaIndex best practices
 - ✅ All services start successfully with `docker-compose up`
-
-### In Progress 🚧
-- [ ] Quran data migrated to new schema with Ollama embeddings
-- [ ] LlamaIndex successfully ingests and indexes all source types
-- [ ] LangGraph workflow executes full RAG pipeline
-- [ ] Query classification correctly identifies question types (>90% accuracy)
-- [ ] Retrieval returns relevant sources for diverse queries
-- [ ] Responses include verifiable citations (Surah:Verse, Hadith reference)
-- [ ] Fiqh questions return balanced madhab perspectives
-- [ ] System handles 10+ concurrent users without degradation
-- [ ] Average response time <10s for complex queries
