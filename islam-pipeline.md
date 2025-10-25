@@ -81,27 +81,54 @@ alimai/
 │   └── aqidah/
 │       └── aqidah_wasitiyyah.json
 │
-├── backend/                        # LangGraph Server backend (flat structure, no __init__.py)
-│   ├── server.py                   # LangGraph Server setup and configuration
-│   ├── config.py                   # Configuration management
-│   ├── llama_config.py             # LlamaIndex Settings and Ollama configuration
-│   ├── embeddings_service.py       # Wrapper around LlamaIndex OllamaEmbedding
-│   ├── llm_service.py              # Wrapper around LlamaIndex Ollama LLM
-│   ├── qdrant_manager.py           # Vector DB operations (migrated from root)
-│   ├── chunking.py                 # LlamaIndex NodeParsers for all text types
-│   ├── ingestion.py                # LlamaIndex IngestionPipeline orchestration
-│   ├── retrieval.py                # LlamaIndex query engine wrapper
-│   ├── rag_graph.py                # LangGraph StateGraph workflow definition
-│   ├── rag_nodes.py                # Individual LangGraph workflow nodes
-│   ├── reranker_service.py         # Ollama reranker client (optional)
-│   ├── context_formatter.py        # Format retrieved context for RAG
-│   ├── prompts.py                  # System prompts and templates
-│   ├── models.py                   # Pydantic schemas (state, API, documents)
-│   ├── utils.py                    # General utilities
-│   └── admin/
-│       ├── ingestion_api.py        # Admin endpoints for ingestion
-│       ├── collection_api.py       # Admin endpoints for collection management
-│       └── models_api.py           # Admin endpoints for model management
+├── backend/                        # Modular backend with Python packages
+│   ├── __init__.py                 # Makes backend a package
+│   │
+│   ├── core/                       # ✅ Core configuration & models
+│   │   ├── __init__.py
+│   │   ├── config.py               # Configuration management
+│   │   ├── models.py               # Pydantic schemas (state, API, documents)
+│   │   └── utils.py                # General utilities & logging
+│   │
+│   ├── llama/                      # ✅ LlamaIndex/Ollama integration
+│   │   ├── __init__.py
+│   │   ├── llama_config.py         # LlamaIndex Settings and Ollama configuration
+│   │   ├── embeddings_service.py   # Wrapper around LlamaIndex OllamaEmbedding
+│   │   ├── llm_service.py          # Wrapper around LlamaIndex Ollama LLM
+│   │   └── reranker_service.py     # LLM-based reranker
+│   │
+│   ├── vectordb/                   # ✅ Vector database operations
+│   │   ├── __init__.py
+│   │   └── qdrant_manager.py       # Qdrant + LlamaIndex VectorStore integration
+│   │
+│   ├── ingestion/                  # ✅ Data ingestion pipeline
+│   │   ├── __init__.py
+│   │   ├── parsers.py              # LlamaIndex NodeParsers (Quran, Hadith, Tafsir, Fiqh, Seerah)
+│   │   ├── chunking.py             # Text chunking utilities
+│   │   ├── ingestion.py            # LlamaIndex IngestionPipeline orchestration
+│   │   └── migrate_data.py         # Data migration utility
+│   │
+│   ├── rag/                        # Stage 5: RAG components
+│   │   ├── __init__.py
+│   │   ├── rag_graph.py            # LangGraph StateGraph workflow definition
+│   │   ├── rag_nodes.py            # Individual LangGraph workflow nodes
+│   │   ├── retrieval.py            # LlamaIndex query engine wrapper
+│   │   ├── context_formatter.py    # Format retrieved context for RAG
+│   │   └── prompts.py              # System prompts and templates
+│   │
+│   ├── api/                        # Stage 5: Server & API
+│   │   ├── __init__.py
+│   │   ├── server.py               # LangGraph Server setup and configuration
+│   │   └── admin/
+│   │       ├── __init__.py
+│   │       ├── ingestion_api.py    # Admin endpoints for ingestion
+│   │       ├── collection_api.py   # Admin endpoints for collection management
+│   │       └── models_api.py       # Admin endpoints for model management
+│   │
+│   └── tests/                      # ✅ Test suite
+│       ├── __init__.py
+│       ├── test_stage4.py          # Stage 4 ingestion tests
+│       └── test_imports.py         # Import verification tests
 │
 ├── langgraph.json                  # LangGraph Server configuration
 │
@@ -134,20 +161,21 @@ alimai/
 **Key Organizational Principles:**
 
 1. **LangGraph Server:** Native API server with built-in streaming, state persistence, and thread management
-2. **Flat Architecture:** No `__init__.py` files - all modules in `backend/` logically grouped in the same file/directory
-3. **Import Style:** `from backend.qdrant_manager import QdrantManager`
+2. **Modular Architecture:** Python packages with `__init__.py` files for proper module organization
+3. **Import Style:** `from backend.core.config import Config`, `from backend.vectordb.qdrant_manager import QdrantManager`
 4. **Separation of Concerns:** Frontend (React), Backend (LangGraph Server), RAG (LlamaIndex + LangGraph), Data (JSON files), Infrastructure (Docker)
 5. **LlamaIndex Integration:** All indexing, retrieval, and query operations use LlamaIndex
 6. **LangGraph Orchestration:** Complex RAG workflow managed by LangGraph StateGraph with native API endpoints
 7. **Ollama Integration:** All models (embedding, reranker, chat) hosted through Ollama, accessed via LlamaIndex
 8. **Admin UI:** All ingestion, migration, and management functionality accessible through React admin panel (no standalone scripts)
-9. **Existing Files Migration:**
-   - `embeddings_manager.py` → `backend/embeddings_service.py` (wrapper around LlamaIndex OllamaEmbedding)
-   - `qdrant_manager.py` → `backend/qdrant_manager.py` (updated for LlamaIndex integration)
-   - `quran_chunker.py` → `backend/chunking.py` (converted to LlamaIndex NodeParsers)
+9. **Existing Files Migration (Stage 4 Complete):**
+   - `embeddings_manager.py` → `backend/llama/embeddings_service.py` (wrapper around LlamaIndex OllamaEmbedding)
+   - `qdrant_manager.py` → `backend/vectordb/qdrant_manager.py` (updated for LlamaIndex integration)
+   - `quran_chunker.py` → `backend/ingestion/chunking.py` (converted to LlamaIndex NodeParsers)
+   - All parsers in `backend/ingestion/parsers.py` (QuranNodeParser, HadithNodeParser, etc.)
 10. **Configuration:** 
-    - `backend/config.py` - General configuration
-    - `backend/llama_config.py` - LlamaIndex settings
+    - `backend/core/config.py` - General configuration
+    - `backend/llama/llama_config.py` - LlamaIndex settings
     - `langgraph.json` - LangGraph Server configuration
 
 ## Phase 3: Data Ingestion Architecture (LlamaIndex)
@@ -578,33 +606,57 @@ pip install langchain-community
 pip install langchain-ollama
 ```
 
-### Step 2: Backend restructuring
+### Step 2: Backend restructuring ✅ COMPLETE (Stage 4)
 
-1. Create `backend/` directory
-2. Migrate and refactor existing files:
-   - `embeddings_manager.py` → `backend/embeddings_service.py` (wrapper around LlamaIndex OllamaEmbedding)
-   - `qdrant_manager.py` → `backend/qdrant_manager.py` (update for LlamaIndex integration)
-   - `quran_chunker.py` → `backend/chunking.py` (convert to LlamaIndex NodeParsers)
-3. Create LlamaIndex integration modules:
-   - `backend/llama_config.py` - LlamaIndex Settings and Ollama configuration
-   - `backend/ingestion.py` - LlamaIndex IngestionPipeline orchestration
-   - `backend/retrieval.py` - LlamaIndex query engine wrapper
-4. Create LangGraph workflow modules:
-   - `backend/rag_graph.py` - LangGraph StateGraph definition with checkpointing
-   - `backend/rag_nodes.py` - Individual workflow nodes
-   - `backend/context_formatter.py` - Context formatting
-   - `backend/prompts.py` - System prompts and templates
-5. Create supporting modules:
-   - `backend/config.py` - Configuration management
-   - `backend/llm_service.py` - LlamaIndex Ollama LLM wrapper
-   - `backend/models.py` - Pydantic schemas for state and API
-6. Create LangGraph Server structure:
-   - `backend/server.py` - LangGraph Server setup and custom endpoints
-   - `backend/admin/` directory - Admin API endpoints
-     - `ingestion_api.py` - Ingestion endpoints
-     - `collection_api.py` - Collection management endpoints
-     - `models_api.py` - Model status endpoints
-   - `langgraph.json` - LangGraph Server configuration file
+1. Create modular `backend/` structure with Python packages:
+   ```bash
+   backend/
+   ├── core/          # Configuration, models, utilities
+   ├── llama/         # LlamaIndex/Ollama integration
+   ├── vectordb/      # Vector database operations
+   ├── ingestion/     # Data pipeline
+   ├── rag/           # RAG workflow (Stage 5)
+   ├── api/           # Server & endpoints (Stage 5)
+   └── tests/         # Test suite
+   ```
+
+2. **Core modules** (`backend/core/`):
+   - `config.py` - Configuration management
+   - `models.py` - Pydantic schemas (state, API, documents)
+   - `utils.py` - Utilities & logging
+
+3. **LlamaIndex integration** (`backend/llama/`):
+   - `llama_config.py` - LlamaIndex Settings and Ollama configuration
+   - `embeddings_service.py` - Wrapper around LlamaIndex OllamaEmbedding
+   - `llm_service.py` - Wrapper around LlamaIndex Ollama LLM
+   - `reranker_service.py` - LLM-based reranking
+
+4. **Vector database** (`backend/vectordb/`):
+   - `qdrant_manager.py` - Qdrant + LlamaIndex VectorStore integration
+
+5. **Ingestion pipeline** (`backend/ingestion/`):
+   - `parsers.py` - LlamaIndex NodeParsers (Quran, Hadith, Tafsir, Fiqh, Seerah)
+   - `chunking.py` - Text chunking utilities
+   - `ingestion.py` - LlamaIndex IngestionPipeline orchestration
+   - `migrate_data.py` - Data migration utility
+
+6. **RAG workflow** (`backend/rag/` - Stage 5):
+   - `rag_graph.py` - LangGraph StateGraph definition
+   - `rag_nodes.py` - Individual workflow nodes
+   - `retrieval.py` - LlamaIndex query engine wrapper
+   - `context_formatter.py` - Context formatting
+   - `prompts.py` - System prompts and templates
+
+7. **API & Server** (`backend/api/` - Stage 5):
+   - `server.py` - LangGraph Server setup
+   - `admin/ingestion_api.py` - Ingestion endpoints
+   - `admin/collection_api.py` - Collection management
+   - `admin/models_api.py` - Model status endpoints
+   - `langgraph.json` - LangGraph Server configuration (root level)
+
+8. **Tests** (`backend/tests/`):
+   - `test_stage4.py` - Stage 4 ingestion tests
+   - `test_imports.py` - Import verification
 
 ### Step 3: Update docker-compose.yml
 
@@ -625,12 +677,12 @@ pip install langchain-ollama
 6. Connect to LangGraph Server via SDK for chat
 7. Connect to admin API via axios for management operations
 
-### Step 5: Data model migration
+### Step 5: Data model migration ✅ COMPLETE (Stage 4)
 
-- Update payload schema in `backend/qdrant_manager.py` (make new fields OPTIONAL and additive)
-- Ensure compatibility with LlamaIndex Document metadata structure
-- Add filtered search methods by source/madhab/authenticity
-- Create migration utility (admin endpoint) to enrich existing Quran entries:
+- ✅ Updated payload schema in `backend/vectordb/qdrant_manager.py` (new fields OPTIONAL and additive)
+- ✅ Ensured compatibility with LlamaIndex Document metadata structure
+- ✅ Added filtered search methods by source/madhab/authenticity
+- ✅ Created migration utility (`backend/ingestion/migrate_data.py`) to enrich existing Quran entries:
   - Add `book_title`: "The Noble Quran"
   - Add `book_title_arabic`: "القرآن الكريم"
   - Add `author`: "Allah (Revealed)"
@@ -671,7 +723,7 @@ Via admin UI:
 
 1. **LlamaIndex for RAG foundation:** Robust indexing, retrieval, and query engine with production-ready features
 2. **LangGraph Server for orchestration:** Native API server with state machine workflow, built-in streaming, and persistence - no Flask needed
-3. **Flat architecture:** No `__init__.py` files - simpler imports, less boilerplate
+3. **Modular architecture:** Python packages with `__init__.py` files - clear separation of concerns (core, llama, vectordb, ingestion, rag, api, tests)
 4. **Ollama integration:** All models (embedding, reranker, chat) managed through Ollama via LlamaIndex
 5. **Admin UI over scripts:** All management functionality (ingestion, migration, collection management) in React admin panel
 6. **LangGraph native endpoints:** Automatic API generation from graph definition with built-in streaming
@@ -684,6 +736,71 @@ Via admin UI:
 13. **Workflow transparency:** LangGraph state machine makes RAG logic explicit and debuggable
 14. **Built-in state management:** LangGraph checkpointing handles conversation threads natively
 15. **LangGraph Studio:** Visual debugging and workflow inspection out of the box
+
+## Backend Restructuring (Completed)
+
+As of Stage 4, the backend has been restructured into a modular architecture with proper Python packages:
+
+### Structure Transformation
+
+**From:** Flat structure with mixed concerns
+**To:** Modular packages with clear separation
+
+### New Import Patterns
+
+```python
+# Core functionality
+from backend.core.config import Config
+from backend.core.models import SourceType, QdrantPayload, create_qdrant_payload
+from backend.core.utils import setup_logging, ProgressTracker
+
+# LlamaIndex/Ollama integration
+from backend.llama.llama_config import configure_llama_index, get_embed_model, get_llm
+from backend.llama.embeddings_service import EmbeddingsService
+from backend.llama.llm_service import LLMService
+from backend.llama.reranker_service import RerankerService
+
+# Vector database
+from backend.vectordb.qdrant_manager import QdrantManager
+
+# Ingestion pipeline
+from backend.ingestion.parsers import QuranNodeParser, HadithNodeParser, TafsirNodeParser
+from backend.ingestion.chunking import parse_tafsir_html, chunk_plain_text
+from backend.ingestion.ingestion import IngestionManager, ingest_quran
+from backend.ingestion.migrate_data import DataMigration
+
+# RAG components (Stage 5)
+from backend.rag.rag_graph import create_rag_graph
+from backend.rag.retrieval import create_retriever
+from backend.rag.prompts import SYSTEM_PROMPT
+
+# API/Server (Stage 5)
+from backend.api.server import create_app
+```
+
+### Benefits Achieved
+
+1. **Clear Separation:** Each package has a single, well-defined responsibility
+2. **Easier Navigation:** Intuitive file organization makes code easy to find
+3. **Better Imports:** Type hints and autocomplete work more effectively
+4. **Scalable:** Easy to add new components without affecting existing code
+5. **Testable:** Isolated packages are easier to test independently
+6. **Stage 5 Ready:** Structure prepared for RAG and API components
+
+### Verification
+
+All imports verified and tested:
+```bash
+# Fast import verification (2 seconds)
+python -m backend.tests.test_imports
+
+# Results: 5/5 tests passed
+✓ Core imports successful
+✓ Llama imports successful
+✓ VectorDB imports successful
+✓ Ingestion imports successful
+✓ Config paths correct
+```
 
 ## Expected Outcomes
 

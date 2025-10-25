@@ -16,8 +16,8 @@ from llama_index.core.postprocessor.llm_rerank import LLMRerank
 from llama_index.core.schema import NodeWithScore
 from llama_index.llms.ollama import Ollama
 
-from backend.config import config
-from backend.utils import setup_logging
+from backend.core.config import config
+from backend.core.utils import setup_logging
 
 logger = setup_logging("reranker_service")
 

@@ -13,8 +13,8 @@ from typing import List, Dict, Optional
 from html.parser import HTMLParser
 
 # Updated imports for backend structure
-from backend.config import Config
-from backend.utils import setup_logging
+from backend.core.config import Config
+from backend.core.utils import setup_logging
 
 logger = setup_logging("chunking")
 

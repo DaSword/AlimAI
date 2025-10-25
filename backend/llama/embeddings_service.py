@@ -10,8 +10,8 @@ Updated in Stage 3 to use Ollama via LlamaIndex.
 import time
 from typing import List, Dict, Any, Optional
 
-from backend.config import config
-from backend.utils import setup_logging
+from backend.core.config import config
+from backend.core.utils import setup_logging
 
 logger = setup_logging("embeddings_service")
 

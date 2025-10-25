@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from llama_index.llms.ollama import Ollama
 from llama_index.core.llms import ChatMessage, MessageRole
 
-from backend.config import config
-from backend.utils import setup_logging
+from backend.core.config import config
+from backend.core.utils import setup_logging
 
 logger = setup_logging("llm_service")
 
