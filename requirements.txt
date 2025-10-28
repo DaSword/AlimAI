@@ -5,8 +5,17 @@ python-dotenv>=1.0.0
 # LlamaIndex core and integrations (Stage 3+)
 llama-index-core>=0.11.0
 llama-index-vector-stores-qdrant>=0.3.0
-llama-index-embeddings-ollama>=0.3.0
-llama-index-llms-ollama>=0.3.0
+
+# Embedding Backends
+llama-index-embeddings-huggingface>=0.3.0  # HuggingFace/SentenceTransformers
+llama-index-embeddings-ollama>=0.3.0       # Ollama
+llama-index-embeddings-openai>=0.2.0       # For LM Studio (OpenAI-compatible)
+sentence-transformers>=2.2.0               # Required for HuggingFace embeddings
+torch>=2.0.0                               # Required for HuggingFace embeddings
+
+# LLM Backends
+llama-index-llms-ollama>=0.3.0            # Ollama
+llama-index-llms-lmstudio>=0.2.0          # LM Studio
 
 # LangGraph and LangChain (Stage 5+)
 langgraph>=0.2.0

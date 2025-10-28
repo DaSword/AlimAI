@@ -178,7 +178,7 @@ class QdrantManager:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Request failed: {str(e)}")
     
-    def inspect_collections(self) -> Dict[str, Any]:
+    def list_collections(self) -> Dict[str, Any]:
         """List all collections in the Qdrant instance."""
         return self._make_request("GET", "/collections")
     

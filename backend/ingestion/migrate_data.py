@@ -16,9 +16,8 @@ Usage:
 """
 
 import argparse
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
-import uuid
 
 from backend.vectordb.qdrant_manager import QdrantManager
 from backend.core.models import SourceType, ChunkType, create_qdrant_payload
@@ -333,7 +332,7 @@ class DataMigration:
             "invalid_point_details": invalid_points[:5],  # Show first 5
         }
         
-        logger.info(f"\nVerification results:")
+        logger.info("\nVerification results:")
         logger.info(f"  - Sample size: {len(points)}")
         logger.info(f"  - Valid points: {valid_count}")
         logger.info(f"  - Invalid points: {len(invalid_points)}")

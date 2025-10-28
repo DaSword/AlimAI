@@ -1,10 +1,10 @@
 """
 Embeddings Service - Generate text embeddings for Islamic texts.
 
-This module provides a wrapper around LlamaIndex's OllamaEmbedding for generating
-embeddings via Ollama
+This module provides a wrapper around LlamaIndex's HuggingFaceEmbedding for generating
+embeddings via SentenceTransformers (much faster than Ollama API).
 
-Updated in Stage 3 to use Ollama via LlamaIndex.
+Updated to use HuggingFace/SentenceTransformers for performance.
 """
 
 import time
@@ -18,64 +18,143 @@ logger = setup_logging("embeddings_service")
 
 class EmbeddingsService:
     """
-    Service class for generating text embeddings using Ollama via LlamaIndex.
+    Service class for generating text embeddings.
     
-    Uses LlamaIndex's OllamaEmbedding for primary embedding generation.
-
+    Supports multiple backends:
+    - HuggingFace/SentenceTransformers (fast, local, batched)
+    - Ollama API (flexible, model variety)
     """
     
     def __init__(
         self,
+        embedding_backend: Optional[str] = None,
         model_name: Optional[str] = None,
+        device: Optional[str] = None,
     ):
         """
         Initialize EmbeddingsService.
         
         Args:
-            model_name: Embedding model name (defaults to config)
+            embedding_backend: Embedding backend ('huggingface' or 'ollama', defaults to config)
+            model_name: Embedding model name (defaults to config based on backend)
+            device: Device for HuggingFace embeddings ('cuda' or 'cpu', auto-detects if None)
         """
-        self.model_name = model_name or config.OLLAMA_EMBEDDING_MODEL
-        self.ollama_embedding = None
+        self.embedding_backend = embedding_backend or config.EMBEDDING_BACKEND
+        self.model_name = model_name
+        self.device = device
+        self.embedding_model = None
         self.vector_size = None
         
-        logger.info("Initialized EmbeddingsService")
+        logger.info(f"Initialized EmbeddingsService with backend: {self.embedding_backend}")
         
-        self._load_ollama_embedding()
+        self._load_embedding_model()
 
-    def _load_ollama_embedding(self) -> bool:
+    def _load_embedding_model(self) -> bool:
         """
-        Load the Ollama embedding model via LlamaIndex.
+        Load the embedding model based on configured backend.
         
         Returns:
             True if model loaded successfully, False otherwise
         """
         try:
-            from llama_index.embeddings.ollama import OllamaEmbedding
+            if self.embedding_backend == "huggingface":
+                from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+                
+                self.model_name = self.model_name or config.EMBEDDING_MODEL
+                logger.info(f"Loading HuggingFace embedding model: {self.model_name}")
+                
+                # Auto-detect device if not specified
+                if self.device is None:
+                    import torch
+                    self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                
+                logger.info(f"Using device: {self.device}")
+                
+                # Get HuggingFace token from environment if available
+                import os
+                hf_token = os.getenv("HUGGINGFACE_TOKEN") or os.getenv("HF_TOKEN")
+                
+                embed_model_kwargs = {
+                    "model_name": self.model_name,
+                    "device": self.device,
+                    "trust_remote_code": True,
+                }
+                
+                # Add token if available (required for gated models like embeddinggemma)
+                if hf_token:
+                    logger.info("✓ Using HuggingFace token for authentication")
+                    embed_model_kwargs["token"] = hf_token
+                
+                self.embedding_model = HuggingFaceEmbedding(**embed_model_kwargs)
+                
+                # Test embedding to detect vector dimensions
+                test_embedding = self.embedding_model.get_text_embedding("test")
+                self.vector_size = len(test_embedding)
+                
+                logger.info("✓ HuggingFace embedding model loaded successfully")
+                logger.info(f"✓ Vector dimensions: {self.vector_size}")
+                return True
+                
+            elif self.embedding_backend == "ollama":
+                from llama_index.embeddings.ollama import OllamaEmbedding
+                
+                self.model_name = self.model_name or config.OLLAMA_EMBEDDING_MODEL
+                logger.info(f"Loading Ollama embedding model: {self.model_name}")
+                
+                self.embedding_model = OllamaEmbedding(
+                    model_name=self.model_name,
+                    base_url=config.OLLAMA_URL,
+                    request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
+                )
+                
+                # Test embedding to detect vector dimensions
+                test_embedding = self.embedding_model.get_text_embedding("test")
+                self.vector_size = len(test_embedding)
+                
+                logger.info("✓ Ollama embedding model loaded successfully")
+                logger.info(f"✓ Vector dimensions: {self.vector_size}")
+                return True
             
-            logger.info(f"Loading Ollama embedding model: {self.model_name}")
+            elif self.embedding_backend == "lmstudio":
+                from llama_index.embeddings.openai import OpenAIEmbedding
+                from llama_index.embeddings.openai.base import OpenAIEmbeddingMode
+                
+                self.model_name = self.model_name or config.LMSTUDIO_EMBEDDING_MODEL
+                logger.info(f"Loading LM Studio embedding model: {self.model_name}")
+                logger.info(f"LM Studio URL: {config.LMSTUDIO_URL}")
+                
+                # For LM Studio with custom models, use SIMILARITY_MODE
+                self.embedding_model = OpenAIEmbedding(
+                    model_name=self.model_name,
+                    api_base=config.LMSTUDIO_URL,
+                    api_key="lm-studio",  # LM Studio doesn't require a real API key
+                    mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+                )
+                
+                # Test embedding to detect vector dimensions
+                test_embedding = self.embedding_model.get_text_embedding("test")
+                self.vector_size = len(test_embedding)
+                
+                logger.info("✓ LM Studio embedding model loaded successfully")
+                logger.info(f"✓ Vector dimensions: {self.vector_size}")
+                return True
             
-            self.ollama_embedding = OllamaEmbedding(
-                model_name=self.model_name,
-                base_url=config.OLLAMA_URL,
-                request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
-            )
+            else:
+                logger.error(f"Unknown embedding backend: {self.embedding_backend}")
+                logger.error("  Use 'huggingface', 'ollama', or 'lmstudio'")
+                return False
             
-            # Test embedding to detect vector dimensions
-            test_embedding = self.ollama_embedding.get_text_embedding("test")
-            self.vector_size = len(test_embedding)
-            
-            logger.info("Ollama embedding model loaded successfully")
-            logger.info(f"Vector dimensions: {self.vector_size}")
-            return True
-            
-        except ImportError:
-            logger.error("llama-index-embeddings-ollama not installed")
-            logger.error("  Install with: pip install llama-index-embeddings-ollama")
+        except ImportError as e:
+            logger.error(f"Required package not installed: {str(e)}")
+            if self.embedding_backend == "huggingface":
+                logger.error("  Install with: pip install llama-index-embeddings-huggingface sentence-transformers")
+            else:
+                logger.error("  Install with: pip install llama-index-embeddings-ollama")
             return False
         except Exception as e:
-            logger.error(f"Failed to load Ollama embedding model: {str(e)}")
-            logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
-            logger.error(f"  And model '{self.model_name}' is available")
+            logger.error(f"Failed to load embedding model: {str(e)}")
+            logger.error(f"  Backend: {self.embedding_backend}")
+            logger.error(f"  Model: '{self.model_name}'")
             return False
     
     def check_model_availability(self) -> bool:
@@ -85,7 +164,7 @@ class EmbeddingsService:
         Returns:
             True if model is available, False otherwise
         """
-        return self.ollama_embedding is not None
+        return self.embedding_model is not None
     
     def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -107,7 +186,7 @@ class EmbeddingsService:
             return None
         
         try:
-            embedding = self.ollama_embedding.get_text_embedding(text.strip())
+            embedding = self.embedding_model.get_text_embedding(text.strip())
             return embedding
             
         except Exception as e:
@@ -120,7 +199,10 @@ class EmbeddingsService:
         show_progress: bool = True
     ) -> List[Optional[List[float]]]:
         """
-        Generate embeddings for multiple texts efficiently.
+        Generate embeddings for multiple texts efficiently using true batching.
+        
+        This is much faster than the Ollama API approach as it processes
+        texts in parallel using tensor operations.
         
         Args:
             texts: List of texts to embed
@@ -140,23 +222,15 @@ class EmbeddingsService:
             logger.info(f"Generating embeddings for {total} texts...")
         
         try:
-            # LlamaIndex OllamaEmbedding doesn't have batch method exposed,
-            # so we'll process in batches manually
-            embeddings = []
-            batch_size = config.OLLAMA_EMBEDDING_BATCH_SIZE
+            # HuggingFaceEmbedding supports true batching - much faster!
+            # Clean texts
+            clean_texts = [text.strip() for text in texts if text and text.strip()]
             
-            for i in range(0, total, batch_size):
-                batch = texts[i:i + batch_size]
-                
-                if show_progress:
-                    logger.info(f"Processing batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size}")
-                
-                # Get embeddings for batch
-                batch_embeddings = [
-                    self.ollama_embedding.get_text_embedding(text.strip())
-                    for text in batch if text and text.strip()
-                ]
-                embeddings.extend(batch_embeddings)
+            # Use the embed_documents method for batch processing
+            embeddings = self.embedding_model.get_text_embedding_batch(clean_texts)
+            
+            if show_progress:
+                logger.info(f"✓ Generated {len(embeddings)} embeddings")
             
             return embeddings
         

@@ -34,7 +34,11 @@ class ChatResponse:
 
 class LLMService:
     """
-    Simplified service for direct LLM completions via LlamaIndex Ollama.
+    Simplified service for direct LLM completions via LlamaIndex.
+    
+    Supports multiple backends:
+    - Ollama (default)
+    - LM Studio (local server)
     
     Use this when you need:
     - Direct LLM calls without RAG
@@ -49,6 +53,7 @@ class LLMService:
     
     def __init__(
         self,
+        llm_backend: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
@@ -58,69 +63,105 @@ class LLMService:
         Initialize LLMService.
         
         Args:
-            model: Ollama model name (defaults to config)
+            llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+            model: LLM model name (defaults to config based on backend)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
             system_prompt: Default system prompt for conversations
         """
-        self.model_name = model or config.OLLAMA_CHAT_MODEL
+        self.llm_backend = llm_backend or config.LLM_BACKEND
+        
+        # Set model name based on backend
+        if self.llm_backend == "lmstudio":
+            self.model_name = model or config.LMSTUDIO_CHAT_MODEL
+            self.max_tokens = max_tokens or config.LMSTUDIO_MAX_TOKENS
+        else:  # ollama
+            self.model_name = model or config.OLLAMA_CHAT_MODEL
+            self.max_tokens = max_tokens or config.OLLAMA_MAX_TOKENS
+        
         self.temperature = temperature
-        self.max_tokens = config.OLLAMA_MAX_TOKENS
         self.system_prompt = system_prompt
-        self.ollama_llm = None
+        self.llm = None
         
         logger.info("Initialized LLMService")
+        logger.info(f"  Backend: {self.llm_backend}")
         logger.info(f"  Model: {self.model_name}")
         logger.info(f"  Temperature: {self.temperature}")
         logger.info(f"  Max Tokens: {self.max_tokens or 'unlimited'}")
     
     def get_llm(self):
         """
-        Get the underlying Ollama LLM instance.
+        Get the underlying LLM instance.
         
         Returns:
-            Ollama LLM instance (lazily loaded)
+            LLM instance (lazily loaded)
         """
-        if self.ollama_llm is None:
-            self._load_ollama_llm()
-        return self.ollama_llm
+        if self.llm is None:
+            self._load_llm()
+        return self.llm
         
-    def _load_ollama_llm(self) -> bool:
+    def _load_llm(self) -> bool:
         """
-        Load the Ollama LLM via LlamaIndex.
+        Load the LLM via LlamaIndex based on configured backend.
         
         Returns:
             True if model loaded successfully, False otherwise
         """
         try:
+            if self.llm_backend == "ollama":
+                from llama_index.llms.ollama import Ollama
+                
+                logger.info(f"Loading Ollama LLM: {self.model_name}")
+                
+                # Build kwargs for Ollama
+                kwargs = {
+                    "model": self.model_name,
+                    "base_url": config.OLLAMA_URL,
+                    "temperature": self.temperature,
+                    "request_timeout": config.OLLAMA_REQUEST_TIMEOUT,
+                    "context_window": self.max_tokens or config.OLLAMA_MAX_TOKENS,
+                }
+                
+                self.llm = Ollama(**kwargs)
+                logger.info("✓ Ollama LLM loaded successfully")
+                return True
             
-            logger.info(f"Loading Ollama LLM: {self.model_name}")
+            elif self.llm_backend == "lmstudio":
+                from llama_index.llms.lmstudio import LMStudio
+                
+                logger.info(f"Loading LM Studio LLM: {self.model_name}")
+                logger.info(f"  LM Studio Request Timeout: {config.LMSTUDIO_REQUEST_TIMEOUT}s")
+                
+                # Build kwargs for LM Studio
+                kwargs = {
+                    "model_name": self.model_name,
+                    "base_url": config.LMSTUDIO_URL,
+                    "temperature": self.temperature,
+                    "request_timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
+                    "timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
+                }
+                
+                self.llm = LMStudio(**kwargs)
+                logger.info("✓ LM Studio LLM loaded successfully")
+                return True
             
-            # Build kwargs for Ollama
-            kwargs = {
-                "model": self.model_name,
-                "base_url": config.OLLAMA_URL,
-                "temperature": self.temperature,
-                "request_timeout": config.OLLAMA_REQUEST_TIMEOUT,
-                "context_window": config.OLLAMA_MAX_TOKENS,
-            }
+            else:
+                logger.error(f"Unknown LLM backend: {self.llm_backend}")
+                return False
             
-            # Add max_tokens if specified
-            if self.max_tokens:
-                kwargs["context_window"] = self.max_tokens
-            
-            self.ollama_llm = Ollama(**kwargs)
-            
-            logger.info("Ollama LLM loaded successfully")
-            return True
-            
-        except ImportError:
-            logger.error("llama-index-llms-ollama not installed")
-            logger.error("  Install with: pip install llama-index-llms-ollama")
+        except ImportError as e:
+            logger.error(f"Required package not installed: {str(e)}")
+            if self.llm_backend == "ollama":
+                logger.error("  Install with: pip install llama-index-llms-ollama")
+            else:
+                logger.error("  Install with: pip install llama-index-llms-lmstudio")
             return False
         except Exception as e:
-            logger.error(f"Failed to load Ollama LLM: {str(e)}")
-            logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
+            logger.error(f"Failed to load LLM: {str(e)}")
+            if self.llm_backend == "ollama":
+                logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
+            else:
+                logger.error(f"  Make sure LM Studio is running at {config.LMSTUDIO_URL}")
             logger.error(f"  And model '{self.model_name}' is available")
             return False
     
@@ -131,9 +172,9 @@ class LLMService:
         Returns:
             True if model is available, False otherwise
         """
-        if self.ollama_llm is None:
+        if self.llm is None:
             try:
-                self._load_ollama_llm()
+                self._load_llm()
                 return True
             except Exception as e:
                 logger.error(f"Error checking model availability: {str(e)}")
@@ -197,7 +238,7 @@ class LLMService:
             
             # Generate completion
             start_time = time.time()
-            response = self.ollama_llm.chat(messages)
+            response = self.llm.chat(messages)
             elapsed_time = time.time() - start_time
             
             # Build response object
@@ -271,7 +312,7 @@ class LLMService:
             
             # Stream completion
             logger.info("Streaming chat response...")
-            response_stream = self.ollama_llm.stream_chat(messages)
+            response_stream = self.llm.stream_chat(messages)
             
             for chunk in response_stream:
                 if chunk.delta:
@@ -301,7 +342,7 @@ class LLMService:
             return None
         
         try:
-            response = self.ollama_llm.complete(prompt.strip())
+            response = self.llm.complete(prompt.strip())
             return response.text
             
         except Exception as e:
@@ -328,7 +369,7 @@ class LLMService:
             return
         
         try:
-            response_stream = self.ollama_llm.stream_complete(prompt.strip())
+            response_stream = self.llm.stream_complete(prompt.strip())
             
             for chunk in response_stream:
                 if chunk.delta:

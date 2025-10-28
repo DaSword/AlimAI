@@ -2,7 +2,7 @@
 Reranker Service - Rerank retrieved documents for improved relevance.
 
 This module provides reranking functionality using LlamaIndex's LLMRerank
-postprocessor with Ollama LLM. Follows LlamaIndex best practices.
+postprocessor with LLM backends (Ollama or LM Studio). Follows LlamaIndex best practices.
 
 Based on: https://developers.llamaindex.ai/python/examples/workflow/rag/
 
@@ -14,7 +14,6 @@ from typing import List, Dict, Any, Optional
 
 from llama_index.core.postprocessor.llm_rerank import LLMRerank
 from llama_index.core.schema import NodeWithScore
-from llama_index.llms.ollama import Ollama
 
 from backend.core.config import config
 from backend.core.utils import setup_logging
@@ -26,12 +25,16 @@ class RerankerService:
     """
     Service class for reranking retrieved documents using LlamaIndex's LLMRerank.
     
-    Uses Ollama LLM as the reranker following LlamaIndex best practices.
+    Supports multiple backends:
+    - Ollama (default)
+    - LM Studio (local server)
+    
     The LLM evaluates query-document relevance to reorder results.
     """
     
     def __init__(
         self,
+        llm_backend: Optional[str] = None,
         llm_model: Optional[str] = None,
         top_n: int = 5,
         choice_batch_size: int = 10
@@ -40,16 +43,25 @@ class RerankerService:
         Initialize RerankerService.
         
         Args:
-            llm_model: Ollama LLM model name for reranking (defaults to config)
+            llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+            llm_model: LLM model name for reranking (defaults to config based on backend)
             top_n: Number of top results to return after reranking
             choice_batch_size: Batch size for reranking choices
         """
-        self.llm_model = llm_model or config.OLLAMA_RERANKER_MODEL
+        self.llm_backend = llm_backend or config.LLM_BACKEND
+        
+        # Set model name based on backend
+        if self.llm_backend == "lmstudio":
+            self.llm_model = llm_model or config.LMSTUDIO_RERANKER_MODEL
+        else:  # ollama
+            self.llm_model = llm_model or config.OLLAMA_RERANKER_MODEL
+        
         self.top_n = top_n
         self.choice_batch_size = choice_batch_size
         self.reranker = None
         
         logger.info("Initialized RerankerService")
+        logger.info(f"  Backend: {self.llm_backend}")
         logger.info(f"  LLM Model: {self.llm_model}")
         logger.info(f"  Top N: {self.top_n}")
         logger.info(f"  Batch Size: {self.choice_batch_size}")
@@ -62,15 +74,25 @@ class RerankerService:
             Configured LLMRerank postprocessor
         """
         if self.reranker is None:
-            logger.info(f"Creating LLMRerank with {self.llm_model}")
+            logger.info(f"Creating LLMRerank with {self.llm_model} ({self.llm_backend})")
             
-            # Create Ollama LLM for reranking
-            llm = Ollama(
-                model=self.llm_model,
-                base_url=config.OLLAMA_URL,
-                request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
-                context_window=config.OLLAMA_MAX_TOKENS,
-            )
+            # Create LLM instance based on backend
+            if self.llm_backend == "ollama":
+                from llama_index.llms.ollama import Ollama
+                llm = Ollama(
+                    model=self.llm_model,
+                    base_url=config.OLLAMA_URL,
+                    request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
+                    context_window=config.OLLAMA_MAX_TOKENS,
+                )
+            elif self.llm_backend == "lmstudio":
+                from llama_index.llms.lmstudio import LMStudio
+                llm = LMStudio(
+                    model_name=self.llm_model,
+                    base_url=config.LMSTUDIO_URL,
+                )
+            else:
+                raise ValueError(f"Unknown LLM backend: {self.llm_backend}")
             
             # Create LLMRerank postprocessor
             self.reranker = LLMRerank(
@@ -178,7 +200,7 @@ class RerankerService:
         
         result = {
             "success": True,
-            "backend": "llama_index_llm_rerank",
+            "backend": self.llm_backend,
             "llm_model": self.llm_model,
             "query": query,
             "num_nodes": len(nodes),
@@ -197,7 +219,7 @@ class RerankerService:
 
 def main():
     """Main function to test the reranker service."""
-    print("Testing LlamaIndex LLMRerank with Ollama")
+    print(f"Testing LlamaIndex LLMRerank with {config.LLM_BACKEND}")
     
     # Initialize service
     service = RerankerService(top_n=2)

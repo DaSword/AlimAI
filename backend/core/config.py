@@ -21,16 +21,36 @@ class Config:
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "islamic_knowledge")
     
+    # Embedding Configuration
+    # Backend options: "huggingface" (fast, local), "ollama" (API-based), or "lmstudio" (local server)
+    EMBEDDING_BACKEND: str = os.getenv("EMBEDDING_BACKEND", "huggingface")
+    
+    # LLM Backend Configuration
+    # Backend options: "ollama" (default), "lmstudio" (local server)
+    LLM_BACKEND: str = os.getenv("LLM_BACKEND", "lmstudio")
+    
+    # HuggingFace/SentenceTransformers model (when EMBEDDING_BACKEND="huggingface")
+    # Fast, local embeddings with true batching
+    # Options: "google/embeddinggemma-300m", "BAAI/bge-base-en-v1.5", "sentence-transformers/all-mpnet-base-v2"
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "google/embeddinggemma-300m")
+    
     # Ollama Configuration
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    OLLAMA_EMBEDDING_MODEL: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "embeddinggemma")
+    OLLAMA_EMBEDDING_MODEL: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "embeddinggemma")  # When EMBEDDING_BACKEND="ollama"
     OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5:3b")
     OLLAMA_RERANKER_MODEL: Optional[str] = os.getenv("OLLAMA_RERANKER_MODEL", "dengcao/Qwen3-Reranker-0.6B:Q8_0")
     OLLAMA_MAX_TOKENS: int = int(os.getenv("OLLAMA_MAX_TOKENS", "1000"))
-
-    # Ollama Model Configuration
-    OLLAMA_REQUEST_TIMEOUT: int = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "30"))
+    OLLAMA_REQUEST_TIMEOUT: int = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "100"))
     OLLAMA_EMBEDDING_BATCH_SIZE: int = int(os.getenv("OLLAMA_EMBEDDING_BATCH_SIZE", "5"))
+    
+    # LM Studio Configuration
+    LMSTUDIO_URL: str = os.getenv("LMSTUDIO_URL", "http://localhost:1234/v1")
+    LMSTUDIO_EMBEDDING_MODEL: str = os.getenv("LMSTUDIO_EMBEDDING_MODEL", "text-embedding-embeddinggemma-300m-qat")  # When EMBEDDING_BACKEND="lmstudio"
+    LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "islamspecialist-pro-12b")  # When LLM_BACKEND="lmstudio"
+    # LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "qwen/qwen3-vl-8b")  # When LLM_BACKEND="lmstudio"
+    LMSTUDIO_RERANKER_MODEL: Optional[str] = os.getenv("LMSTUDIO_RERANKER_MODEL", "hermes-2-pro-llama-3-8b")
+    LMSTUDIO_MAX_TOKENS: int = int(os.getenv("LMSTUDIO_MAX_TOKENS", "1000"))
+    LMSTUDIO_REQUEST_TIMEOUT: int = int(os.getenv("LMSTUDIO_REQUEST_TIMEOUT", "1000"))
     
     # Vector Configuration
     VECTOR_SIZE: int = int(os.getenv("VECTOR_SIZE", "768"))  # embeddinggemma default

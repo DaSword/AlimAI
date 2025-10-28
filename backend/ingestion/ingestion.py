@@ -248,7 +248,7 @@ class IngestionManager:
             vector_store=vector_store,
         )
         
-        logger.info(f"Created ingestion pipeline for {source_type.value}")
+        logger.info(f"Created ingestion pipeline for {source_type.value} Source Type")
         return pipeline
     
     def ingest_file(
@@ -259,7 +259,10 @@ class IngestionManager:
         batch_size: int = 100,
     ) -> Dict[str, Any]:
         """
-        Ingest a JSON file into the vector database.
+        Ingest a JSON file into the vector database with streaming/batching.
+        
+        This method loads data in batches to avoid loading everything into memory.
+        Each batch is processed (parsed, embedded, and stored) before moving to the next.
         
         Args:
             file_path: Path to JSON file
@@ -272,11 +275,12 @@ class IngestionManager:
         """
         start_time = datetime.now()
         
-        # Check Ollama connection
-        if not check_ollama_connection():
+        # Check Ollama connection (only needed if using Ollama backend)
+        from backend.core.config import config
+        if config.EMBEDDING_BACKEND == "ollama" and not check_ollama_connection():
             raise RuntimeError("Cannot connect to Ollama service. Make sure it's running.")
         
-        # Load JSON file
+        # Load JSON file (we still need to load it to detect type and count items)
         data = self.load_json_file(file_path)
         
         # Detect source type if not provided
@@ -287,17 +291,21 @@ class IngestionManager:
         
         logger.info(f"Ingesting as {source_type.value}")
         
-        # Convert JSON to Documents
-        documents = self.json_to_documents(data, source_type)
+        # Get the items list based on source type (for counting)
+        items_key = self._get_items_key(source_type)
+        items = data.get(items_key, [])
+        total_items = len(items)
         
-        if not documents:
-            logger.warning("No documents created from JSON file")
+        if total_items == 0:
+            logger.warning("No items found in JSON file")
             return {
                 "source_type": source_type.value,
-                "total_documents": 0,
-                "total_nodes": 0,
-                "elapsed_time": 0,
+                "documents_processed": 0,
+                "nodes_created": 0,
+                "time_elapsed": 0,
             }
+        
+        logger.info(f"Found {total_items} items to process")
         
         # Ensure collection exists
         coll_name = collection_name or self.qdrant_manager.collection_name
@@ -305,24 +313,41 @@ class IngestionManager:
             logger.info(f"Creating collection: {coll_name}")
             self.qdrant_manager.create_collection(collection_name=coll_name)
         
-        # Create and run pipeline
+        # Create pipeline once
         pipeline = self.create_pipeline(source_type, coll_name)
         
-        logger.info(f"Starting ingestion of {len(documents)} documents...")
+        logger.info(f"Starting streaming ingestion of {total_items} items...")
+        logger.info(f"Processing in batches of {batch_size}")
         
         # Process in batches with progress tracking
         total_nodes = 0
-        tracker = ProgressTracker(len(documents), "Ingesting documents")
+        total_docs_processed = 0
+        tracker = ProgressTracker(total_items, "Ingesting items")
         
-        for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
+        # Stream and process batches
+        for i in range(0, total_items, batch_size):
+            batch_items = items[i:i + batch_size]
             
             try:
-                # Run pipeline on batch
-                nodes = pipeline.run(documents=batch)
-                total_nodes += len(nodes)
+                # Create documents for this batch only
+                batch_data = {items_key: batch_items}
+                batch_documents = self.json_to_documents(batch_data, source_type)
                 
-                tracker.update(len(batch))
+                if not batch_documents:
+                    logger.warning(f"No documents created for batch {i//batch_size + 1}")
+                    continue
+                
+                # Run pipeline on this batch (parse, embed, store)
+                nodes = pipeline.run(documents=batch_documents)
+                total_nodes += len(nodes)
+                total_docs_processed += len(batch_documents)
+                
+                tracker.update(len(batch_items))
+                
+                # Clear memory
+                del batch_documents
+                del nodes
+                
             except Exception as e:
                 logger.error(f"Error processing batch {i//batch_size + 1}: {e}")
                 raise
@@ -331,23 +356,39 @@ class IngestionManager:
         
         elapsed_time = (datetime.now() - start_time).total_seconds()
         
+        # Get final collection stats
+        collection_stats = self.qdrant_manager.get_collection_stats(coll_name)
+        
         stats = {
-            "source_type": source_type.value,
+            "source": source_type.value,
             "file_path": file_path,
             "collection_name": coll_name,
-            "total_documents": len(documents),
-            "total_nodes": total_nodes,
-            "elapsed_time": elapsed_time,
+            "documents_processed": total_docs_processed,
+            "nodes_created": total_nodes,
+            "time_elapsed": elapsed_time,
+            "total_points": collection_stats.get('points_count', total_nodes),
             "success": True,
         }
         
         logger.info("Ingestion complete:")
-        logger.info(f"  - Documents: {len(documents)}")
+        logger.info(f"  - Documents: {total_docs_processed}")
         logger.info(f"  - Nodes: {total_nodes}")
-        logger.info(f"  - Time: {elapsed_time:.2f}s")
+        logger.info(f"  - Time: {elapsed_time:.2f}s ({elapsed_time/60:.1f} min)")
         logger.info(f"  - Collection: {coll_name}")
+        logger.info(f"  - Total points in DB: {stats['total_points']}")
         
         return stats
+    
+    def _get_items_key(self, source_type: SourceType) -> str:
+        """Get the key name for items list based on source type."""
+        mapping = {
+            SourceType.QURAN: 'verses',
+            SourceType.HADITH: 'hadiths',
+            SourceType.TAFSIR: 'tafsir_entries',
+            SourceType.FIQH: 'rulings',
+            SourceType.SEERAH: 'events',
+        }
+        return mapping.get(source_type, 'items')
     
     def ingest_directory(
         self,
