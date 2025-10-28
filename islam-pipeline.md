@@ -301,63 +301,114 @@ documents = load_hadith_json()  # Returns List[Document]
 pipeline.run(documents=documents)
 ```
 
-## Phase 4: Ollama Model Integration (via LlamaIndex) ✅ COMPLETED
+## Phase 4: Multi-Backend Model Integration (LlamaIndex) ✅ COMPLETED
 
-**See `RAG-plan.md` for detailed LlamaIndex + Ollama integration patterns.**
+**See `RAG-plan.md` for detailed LlamaIndex integration patterns.**
 
-### 4.1 Ollama Service Setup ✅
+### 4.1 Multi-Backend Architecture ✅
 
-**docker-compose.yml** - Ollama configured and running:
+**Embedding Backends Supported:**
 
-- ✅ Service: `ollama/ollama:latest`
-- ✅ Port: 11434
-- ✅ Models pulled and tested:
-  - `embeddinggemma:latest` - Embedding generation (768 dimensions)
-  - `qwen2.5:3b` - Chat completion (memory efficient)
-  - `dengcao/Qwen3-Embedding-0.6B` - Alternative embedding model
-  - LLM-based reranking via `LLMRerank` (no dedicated reranker needed)
+- ✅ **HuggingFace/SentenceTransformers** - Fast local embeddings with true batching (RECOMMENDED)
+  - Direct inference, no network overhead
+  - GPU acceleration when available
+  - Models: `google/embeddinggemma-300m`, `BAAI/bge-base-en-v1.5`, etc.
+  
+- ✅ **Ollama** - Flexible API-based embeddings
+  - Easy model management via `ollama pull`
+  - Can run on remote servers
+  - Models: `embeddinggemma:latest`, `nomic-embed-text:latest`
+  
+- ✅ **LM Studio** - OpenAI-compatible local server
+  - GUI-based model management
+  - OpenAI API compatibility
+  - Models: `text-embedding-embeddinggemma-300m-qat`, `text-embedding-nomic-embed-text-v1.5`
 
-### 4.2 LlamaIndex + Ollama Configuration (`backend/llama_config.py`) ✅
+**LLM Backends Supported:**
 
-**Embedding Configuration:**
+- ✅ **Ollama** - Default, flexible API-based LLMs
+  - Models: `qwen2.5:3b`, `qwen3-vl-8b`
+  
+- ✅ **LM Studio** - OpenAI-compatible local LLMs
+  - Models: `islamspecialist-pro-12b`, `qwen/qwen3-vl-8b`
+
+### 4.2 LlamaIndex Multi-Backend Configuration (`backend/llama/llama_config.py`) ✅
+
+**Dynamic Backend Selection:**
 
 ```python
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.ollama import Ollama
+from llama_index.llms.lmstudio import LMStudio
 from llama_index.core import Settings
 
-# Configure Ollama embeddings
-embed_model = OllamaEmbedding(
-    model_name="embeddinggemma:latest",
-    base_url="http://localhost:11434",
-)
-
-# Configure Ollama LLM
-llm = Ollama(
-    model="qwen2.5:3b",
-    base_url="http://localhost:11434",
-)
-
-# Set global defaults
-Settings.embed_model = embed_model
-Settings.llm = llm
+# Configure based on environment variables
+def configure_llama_index(
+    embedding_backend="huggingface",  # or "ollama" or "lmstudio"
+    llm_backend="ollama",              # or "lmstudio"
+    embedding_model=None,
+    llm_model=None
+):
+    # HuggingFace (fast local)
+    if embedding_backend == "huggingface":
+        embed_model = HuggingFaceEmbedding(
+            model_name=embedding_model or "google/embeddinggemma-300m",
+            device="cuda" if torch.cuda.is_available() else "cpu",
+        )
+    
+    # Ollama (API-based)
+    elif embedding_backend == "ollama":
+        embed_model = OllamaEmbedding(
+            model_name=embedding_model or "embeddinggemma",
+            base_url="http://localhost:11434",
+        )
+    
+    # LM Studio (OpenAI-compatible)
+    elif embedding_backend == "lmstudio":
+        embed_model = OpenAIEmbedding(
+            model_name=embedding_model or "text-embedding-embeddinggemma-300m-qat",
+            api_base="http://localhost:1234/v1",
+            api_key="lm-studio",
+            mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+        )
+    
+    # Configure LLM similarly based on llm_backend
+    Settings.embed_model = embed_model
+    Settings.llm = llm
 ```
 
-**Backend services integration:** ✅
+**Backend services with multi-backend support:** ✅
 
-- ✅ `backend/embeddings_service.py` - Wrapper around LlamaIndex OllamaEmbedding
-- ✅ `backend/llm_service.py` - Wrapper around LlamaIndex Ollama LLM with streaming support
-- ✅ `backend/reranker_service.py` - Uses LlamaIndex LLMRerank postprocessor
-- ✅ `backend/llama_config.py` - Centralized configuration with helper functions
+- ✅ `backend/llama/embeddings_service.py` - Dynamic backend loading (HuggingFace/Ollama/LM Studio)
+- ✅ `backend/llama/llm_service.py` - Multi-backend LLM support with proper timeout handling
+- ✅ `backend/llama/reranker_service.py` - Backend-aware reranking (Ollama/LM Studio)
+- ✅ `backend/llama/llama_config.py` - Centralized multi-backend configuration
 - ✅ All following LlamaIndex best practices
+
+**Configuration System:** ✅
+
+- ✅ `backend/core/config.py` - Environment-based configuration
+- ✅ `.env` file for backend selection
+- ✅ Separate embedding and LLM backend choices
+- ✅ Model-specific settings per backend
 
 **Helper functions available:**
 
-- `configure_llama_index()` - Set global Settings
-- `get_embed_model()` - Get configured embedding model
-- `get_llm()` - Get configured LLM
-- `check_ollama_connection()` - Verify Ollama is reachable
-- `check_model_available(model_name)` - Check if model is loaded
+- `configure_llama_index(embedding_backend, llm_backend, ...)` - Set global Settings with backend choice
+- `get_embed_model(embedding_backend, model_name, ...)` - Get configured embedding model
+- `get_llm(llm_backend, model, ...)` - Get configured LLM
+- `check_ollama_connection()` - Verify Ollama is reachable (when using Ollama)
+- `check_model_available(model_name)` - Check if Ollama model is loaded
+
+**Performance Comparison:**
+
+| Backend | Speed | Use Case |
+|---------|-------|----------|
+| HuggingFace | ⚡⚡⚡ Fastest | Production ingestion, local inference |
+| Ollama | ⚡⚡ Fast | Development, flexible model management |
+| LM Studio | ⚡⚡ Fast | GUI-based management, OpenAI compatibility |
 
 **Admin API endpoints** (to be integrated into LangGraph Server):
 
@@ -611,50 +662,54 @@ pip install langchain-ollama
 1. Create modular `backend/` structure with Python packages:
    ```bash
    backend/
-   ├── core/          # Configuration, models, utilities
-   ├── llama/         # LlamaIndex/Ollama integration
-   ├── vectordb/      # Vector database operations
-   ├── ingestion/     # Data pipeline
+   ├── core/          # Configuration, models, utilities ✅
+   ├── llama/         # LlamaIndex multi-backend integration ✅
+   ├── vectordb/      # Vector database operations ✅
+   ├── ingestion/     # Data pipeline with streaming ✅
    ├── rag/           # RAG workflow (Stage 5)
    ├── api/           # Server & endpoints (Stage 5)
-   └── tests/         # Test suite
+   └── tests/         # Test suite ✅
    ```
 
-2. **Core modules** (`backend/core/`):
-   - `config.py` - Configuration management
+2. **Core modules** (`backend/core/`) ✅:
+   - `config.py` - Multi-backend configuration management
    - `models.py` - Pydantic schemas (state, API, documents)
    - `utils.py` - Utilities & logging
 
-3. **LlamaIndex integration** (`backend/llama/`):
-   - `llama_config.py` - LlamaIndex Settings and Ollama configuration
-   - `embeddings_service.py` - Wrapper around LlamaIndex OllamaEmbedding
-   - `llm_service.py` - Wrapper around LlamaIndex Ollama LLM
-   - `reranker_service.py` - LLM-based reranking
+3. **LlamaIndex multi-backend integration** (`backend/llama/`) ✅:
+   - `llama_config.py` - Dynamic backend configuration (HuggingFace/Ollama/LM Studio)
+   - `embeddings_service.py` - Multi-backend embedding wrapper (3 backends)
+   - `llm_service.py` - Multi-backend LLM wrapper (2 backends) with timeout handling
+   - `reranker_service.py` - Backend-aware LLM reranking
 
-4. **Vector database** (`backend/vectordb/`):
-   - `qdrant_manager.py` - Qdrant + LlamaIndex VectorStore integration
+4. **Vector database** (`backend/vectordb/`) ✅:
+   - `qdrant_manager.py` - Qdrant + LlamaIndex VectorStore integration with enhanced schema
 
-5. **Ingestion pipeline** (`backend/ingestion/`):
-   - `parsers.py` - LlamaIndex NodeParsers (Quran, Hadith, Tafsir, Fiqh, Seerah)
+5. **Ingestion pipeline** (`backend/ingestion/`) ✅:
+   - `parsers.py` - LlamaIndex NodeParsers (Quran + architecture for others)
    - `chunking.py` - Text chunking utilities
-   - `ingestion.py` - LlamaIndex IngestionPipeline orchestration
+   - `ingestion.py` - Streaming LlamaIndex IngestionPipeline (batch processing)
    - `migrate_data.py` - Data migration utility
 
-6. **RAG workflow** (`backend/rag/` - Stage 5):
+6. **Ingestion & Search Scripts** ✅:
+   - `ingest_quran.py` - Full Quran ingestion with auto vector size detection
+   - `search_quran.py` - Interactive search with backend awareness
+
+7. **RAG workflow** (`backend/rag/` - Stage 5):
    - `rag_graph.py` - LangGraph StateGraph definition
    - `rag_nodes.py` - Individual workflow nodes
    - `retrieval.py` - LlamaIndex query engine wrapper
    - `context_formatter.py` - Context formatting
    - `prompts.py` - System prompts and templates
 
-7. **API & Server** (`backend/api/` - Stage 5):
+8. **API & Server** (`backend/api/` - Stage 5):
    - `server.py` - LangGraph Server setup
    - `admin/ingestion_api.py` - Ingestion endpoints
    - `admin/collection_api.py` - Collection management
    - `admin/models_api.py` - Model status endpoints
    - `langgraph.json` - LangGraph Server configuration (root level)
 
-8. **Tests** (`backend/tests/`):
+9. **Tests** (`backend/tests/`) ✅:
    - `test_stage4.py` - Stage 4 ingestion tests
    - `test_imports.py` - Import verification
 
@@ -677,7 +732,7 @@ pip install langchain-ollama
 6. Connect to LangGraph Server via SDK for chat
 7. Connect to admin API via axios for management operations
 
-### Step 5: Data model migration ✅ COMPLETE (Stage 4)
+### Step 5: Data model migration & ingestion ✅ COMPLETE (Stage 4)
 
 - ✅ Updated payload schema in `backend/vectordb/qdrant_manager.py` (new fields OPTIONAL and additive)
 - ✅ Ensured compatibility with LlamaIndex Document metadata structure
@@ -688,7 +743,19 @@ pip install langchain-ollama
   - Add `author`: "Allah (Revealed)"
   - Add `topic_tags`: Extract from metadata or generate based on content
   - Set `source_type` to standardized value: "quran"
-- Migration only updates metadata, NO re-embedding or re-chunking needed
+- ✅ Migration only updates metadata, NO re-embedding or re-chunking needed
+- ✅ Created streaming ingestion pipeline (`backend/ingestion/ingestion.py`):
+  - Batch-wise processing to prevent memory exhaustion
+  - Progress tracking with visual feedback
+  - Support for all embedding backends
+  - Auto-detects embedding dimensions
+- ✅ Created ingestion scripts:
+  - `ingest_quran.py` - Full Quran ingestion with backend flexibility
+  - `search_quran.py` - Search with backend awareness
+- ✅ Multi-backend configuration system:
+  - Environment-based backend selection
+  - Separate embedding and LLM backends
+  - Proper timeout handling for all backends
 
 ### Step 6: Ingest Tier 1 texts
 
@@ -722,20 +789,25 @@ Via admin UI:
 ## Key Design Decisions
 
 1. **LlamaIndex for RAG foundation:** Robust indexing, retrieval, and query engine with production-ready features
-2. **LangGraph Server for orchestration:** Native API server with state machine workflow, built-in streaming, and persistence - no Flask needed
-3. **Modular architecture:** Python packages with `__init__.py` files - clear separation of concerns (core, llama, vectordb, ingestion, rag, api, tests)
-4. **Ollama integration:** All models (embedding, reranker, chat) managed through Ollama via LlamaIndex
-5. **Admin UI over scripts:** All management functionality (ingestion, migration, collection management) in React admin panel
-6. **LangGraph native endpoints:** Automatic API generation from graph definition with built-in streaming
-7. **Metadata-rich chunks:** Every chunk carries full provenance for citation (LlamaIndex Documents/Nodes)
-8. **Authenticity weighting:** Sahih sources rank higher than Daif in retrieval (handled by LangGraph context ranking)
-9. **Madhab balance:** Fiqh queries fetch from all 4 schools automatically (LangGraph conditional routing)
-10. **Qwen3 as synthesizer:** LLM doesn't invent, only synthesizes retrieved sources
-11. **Progressive ingestion:** Start with Tier 1, expand to Tier 2/3 based on coverage gaps
-12. **Arabic + English:** Maintain both for authenticity and accessibility
-13. **Workflow transparency:** LangGraph state machine makes RAG logic explicit and debuggable
-14. **Built-in state management:** LangGraph checkpointing handles conversation threads natively
-15. **LangGraph Studio:** Visual debugging and workflow inspection out of the box
+2. **Multi-backend flexibility:** Support for 3 embedding backends (HuggingFace/Ollama/LM Studio) and 2 LLM backends (Ollama/LM Studio)
+3. **HuggingFace for performance:** Fast local embeddings with true batching, GPU acceleration when available
+4. **Streaming ingestion:** Batch-wise processing prevents memory exhaustion, enables resumable operations
+5. **LangGraph Server for orchestration:** Native API server with state machine workflow, built-in streaming, and persistence - no Flask needed
+6. **Modular architecture:** Python packages with `__init__.py` files - clear separation of concerns (core, llama, vectordb, ingestion, rag, api, tests)
+7. **Environment-based configuration:** Easy backend switching via `.env` file without code changes
+8. **Admin UI over scripts:** All management functionality (ingestion, migration, collection management) accessible through interfaces
+9. **LangGraph native endpoints:** Automatic API generation from graph definition with built-in streaming
+10. **Metadata-rich chunks:** Every chunk carries full provenance for citation (LlamaIndex Documents/Nodes)
+11. **Authenticity weighting:** Sahih sources rank higher than Daif in retrieval (handled by LangGraph context ranking)
+12. **Madhab balance:** Fiqh queries fetch from all 4 schools automatically (LangGraph conditional routing)
+13. **LLM as synthesizer:** LLM doesn't invent, only synthesizes retrieved sources
+14. **Progressive ingestion:** Start with Tier 1, expand to Tier 2/3 based on coverage gaps
+15. **Arabic + English:** Maintain both for authenticity and accessibility
+16. **Workflow transparency:** LangGraph state machine makes RAG logic explicit and debuggable
+17. **Built-in state management:** LangGraph checkpointing handles conversation threads natively
+18. **LangGraph Studio:** Visual debugging and workflow inspection out of the box
+19. **Proper timeout handling:** Backend-specific timeout configuration prevents premature failures
+20. **Auto-dimension detection:** Embedding dimensions automatically detected for any model
 
 ## Backend Restructuring (Completed)
 
