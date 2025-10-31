@@ -1,0 +1,14 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "rag_assistant": "./backend/rag/rag_graph.py:graph"
+  },
+  "env": ".env",
+  "python_version": "3.12",
+  "pip_config_file": "requirements.txt",
+  "dockerfile_lines": [],
+  "node_version": null
+}
+

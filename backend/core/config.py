@@ -19,7 +19,7 @@ class Config:
     
     # Qdrant Configuration
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
-    QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "islamic_knowledge")
+    QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "islamic_knowledge_huggingface")
     
     # Embedding Configuration
     # Backend options: "huggingface" (fast, local), "ollama" (API-based), or "lmstudio" (local server)
@@ -46,8 +46,8 @@ class Config:
     # LM Studio Configuration
     LMSTUDIO_URL: str = os.getenv("LMSTUDIO_URL", "http://localhost:1234/v1")
     LMSTUDIO_EMBEDDING_MODEL: str = os.getenv("LMSTUDIO_EMBEDDING_MODEL", "text-embedding-embeddinggemma-300m-qat")  # When EMBEDDING_BACKEND="lmstudio"
-    LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "islamspecialist-pro-12b")  # When LLM_BACKEND="lmstudio"
-    # LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "qwen/qwen3-vl-8b")  # When LLM_BACKEND="lmstudio"
+    # LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "")  # When LLM_BACKEND="lmstudio"
+    LMSTUDIO_CHAT_MODEL: str = os.getenv("LMSTUDIO_CHAT_MODEL", "qwen/qwen3-vl-8b")  # When LLM_BACKEND="lmstudio"
     LMSTUDIO_RERANKER_MODEL: Optional[str] = os.getenv("LMSTUDIO_RERANKER_MODEL", "hermes-2-pro-llama-3-8b")
     LMSTUDIO_MAX_TOKENS: int = int(os.getenv("LMSTUDIO_MAX_TOKENS", "1000"))
     LMSTUDIO_REQUEST_TIMEOUT: int = int(os.getenv("LMSTUDIO_REQUEST_TIMEOUT", "1000"))

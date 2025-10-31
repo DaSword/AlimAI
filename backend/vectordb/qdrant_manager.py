@@ -41,7 +41,7 @@ class QdrantManager:
             vector_size: Dimension of vectors (defaults to config)
         """
         self.url = (url or Config.QDRANT_URL).rstrip('/')
-        self.collection_name = collection_name or Config.QDRANT_COLLECTION_NAME
+        self.collection_name = collection_name or Config.QDRANT_COLLECTION
         self.vector_size = vector_size or Config.VECTOR_SIZE
         self.base_url = f"{self.url}/collections/{self.collection_name}"
         

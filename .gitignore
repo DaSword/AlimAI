@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.langgraph_api/
 
 # Virtual Environment
 alimenv/
@@ -31,6 +32,7 @@ ENV/
 
 # IDEs
 .vscode/
+.cursor/
 .idea/
 *.swp
 *.swo

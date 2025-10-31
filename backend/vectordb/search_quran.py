@@ -30,7 +30,7 @@ def search(query: str, collection_name: str = None, top_k: int = 5):
     """
     # Use backend-specific collection name if not provided
     if collection_name is None:
-        collection_name = config.QDRANT_COLLECTION_NAME
+        collection_name = config.QDRANT_COLLECTION
     
     logger.info(f"Searching collection: {collection_name}")
     logger.info(f"Query: {query}")
@@ -122,7 +122,7 @@ def interactive_mode(collection_name: str = None):
     print(f"Backend: {config.EMBEDDING_BACKEND}")
     
     if collection_name is None:
-        collection_name = config.QDRANT_COLLECTION_NAME
+        collection_name = config.QDRANT_COLLECTION
     
     print(f"Collection: {collection_name}")
     print("\nType your questions below. Type 'exit' or 'quit' to stop.")
