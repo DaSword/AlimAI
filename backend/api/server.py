@@ -74,43 +74,31 @@ def create_app_config() -> Dict[str, Any]:
 
 
 # ============================================================================
-# Custom Endpoints (Optional - for admin operations)
+# Custom Admin Endpoints
 # ============================================================================
+#
+# Custom FastAPI routes are added via backend/api/webapp.py
+# These routes are configured in langgraph.json under "http.app"
 # 
-# LangGraph Server can be extended with custom FastAPI routes if needed.
-# For now, admin operations are provided as standalone functions in backend/api/admin/
+# Available admin endpoints (accessible at http://localhost:8123/api/admin/):
 # 
-# To add custom endpoints, you would create a FastAPI app and mount it:
+# Health & Status:
+#   GET  /api/admin/health              - Check health of all services
+#   GET  /api/admin/models              - List Ollama models
+#   GET  /api/admin/models/{name}       - Get specific model info
+#   POST /api/admin/models/{name}/pull  - Pull an Ollama model
 # 
-# from fastapi import FastAPI, HTTPException
-# from backend.api.admin.ingestion_api import ingest_file_handler
-# from backend.api.admin.collection_api import list_collections
-# from backend.api.admin.models_api import get_health_status
+# Collection Management:
+#   GET    /api/admin/collections              - List all collections
+#   GET    /api/admin/collections/{name}       - Get collection stats
+#   DELETE /api/admin/collections/{name}       - Delete a collection
+#   POST   /api/admin/collections/{name}/clear - Clear collection data
+# 
+# Data Ingestion (coming soon):
+#   POST /api/admin/ingestion/upload          - Upload and ingest file
+#   GET  /api/admin/ingestion/status/{task_id} - Get ingestion status
 #
-# admin_app = FastAPI(title="Admin API")
-#
-# @admin_app.post("/admin/ingest")
-# async def ingest_endpoint(
-#     file_path: str,
-#     source_type: str,
-#     batch_size: int = 100,
-# ):
-#     result = await ingest_file_handler(file_path, source_type, batch_size=batch_size)
-#     if not result["success"]:
-#         raise HTTPException(status_code=400, detail=result["error"])
-#     return result
-#
-# @admin_app.get("/admin/collections")
-# async def collections_endpoint():
-#     result = await list_collections()
-#     if not result["success"]:
-#         raise HTTPException(status_code=500, detail=result["error"])
-#     return result
-#
-# @admin_app.get("/admin/health")
-# async def health_endpoint():
-#     result = await get_health_status()
-#     return result
+# Documentation available at: http://localhost:8123/docs
 
 
 # ============================================================================
@@ -138,7 +126,7 @@ def run_dev_server(port: int = 8123, host: str = "0.0.0.0"):
     
     try:
         subprocess.run(
-            ["langgraph", "dev", "--port", str(port), "--host", host],
+            ["langgraph", "dev", "--port", str(port), "--no-browser"],
             check=True
         )
     except subprocess.CalledProcessError as e:
@@ -187,6 +175,12 @@ if __name__ == "__main__":
     print(f"  POST   http://{args.host}:{args.port}/runs/stream")
     print(f"  POST   http://{args.host}:{args.port}/threads")
     print(f"  GET    http://{args.host}:{args.port}/threads/{{thread_id}}")
+    print()
+    print("Admin Endpoints:")
+    print(f"  GET    http://{args.host}:{args.port}/api/admin/health")
+    print(f"  GET    http://{args.host}:{args.port}/api/admin/models")
+    print(f"  GET    http://{args.host}:{args.port}/api/admin/collections")
+    print(f"  Docs:  http://{args.host}:{args.port}/docs")
     print()
     
     # Run server

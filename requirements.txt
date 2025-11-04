@@ -23,6 +23,11 @@ langchain-core>=0.3.0
 langchain-community>=0.3.0
 langchain-ollama>=0.2.0
 
+# FastAPI for custom routes
+fastapi>=0.115.0
+uvicorn>=0.32.0
+python-multipart>=0.0.20  # Required for file upload support
+
 # Data validation and modeling
 pydantic>=2.0.0
 pydantic-settings>=2.0.0

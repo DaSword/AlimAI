@@ -9,6 +9,9 @@
   "python_version": "3.12",
   "pip_config_file": "requirements.txt",
   "dockerfile_lines": [],
-  "node_version": null
+  "node_version": null,
+  "http": {
+    "app": "./backend/api/webapp.py:app"
+  }
 }
 
