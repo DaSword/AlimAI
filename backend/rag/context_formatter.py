@@ -101,7 +101,7 @@ def rank_documents(
         prioritize_authenticity: Whether to weight authenticity heavily
         
     Returns:
-        Ranked list of documents
+        Ranked list of documents with updated scores
     """
     if not documents:
         return []
@@ -118,6 +118,12 @@ def rank_documents(
             elif (doc.metadata.source_type == SourceType.HADITH and 
                   doc.metadata.source_metadata.authenticity_grade == AuthenticityGrade.SAHIH):
                 final_score *= 1.15
+        
+        # Cap score at 1.0
+        final_score = min(final_score, 1.0)
+        
+        # Update document's score with the reranked score
+        doc.score = final_score
         
         scored_docs.append((doc, final_score))
     

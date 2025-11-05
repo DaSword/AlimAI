@@ -233,4 +233,136 @@
     height: 40px;
     background: linear-gradient(135deg, transparent 50%, hsl(var(--islamic-emerald) / 0.1) 50%);
   }
+
+  /* Enhanced prose styles for markdown rendering */
+  .prose {
+    color: hsl(var(--foreground));
+  }
+
+  .prose strong {
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .prose em {
+    color: hsl(var(--accent));
+  }
+
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    color: hsl(var(--foreground));
+    font-weight: 700;
+    border-bottom: 2px solid hsl(var(--border));
+    padding-bottom: 0.25rem;
+  }
+
+  .prose h1 {
+    font-size: 1.5em;
+  }
+
+  .prose h2 {
+    font-size: 1.3em;
+  }
+
+  .prose h3 {
+    font-size: 1.15em;
+  }
+
+  .prose ul, .prose ol {
+    padding-left: 1.5rem;
+  }
+
+  .prose ul {
+    list-style-type: disc;
+  }
+
+  .prose ol {
+    list-style-type: decimal;
+  }
+
+  .prose li {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .prose li::marker {
+    color: hsl(var(--primary));
+  }
+
+  .prose blockquote {
+    border-left: 4px solid hsl(var(--primary));
+    background: hsl(var(--muted) / 0.3);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+  }
+
+  .prose code {
+    background: hsl(var(--muted));
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: 'Courier New', monospace;
+  }
+
+  .prose pre {
+    background: hsl(var(--muted));
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+  }
+
+  .prose pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  .prose a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary) / 0.3);
+    transition: text-decoration-color 0.2s ease;
+  }
+
+  .prose a:hover {
+    text-decoration-color: hsl(var(--primary));
+  }
+
+  .prose hr {
+    border-top: 2px solid hsl(var(--border));
+    margin: 1.5rem 0;
+  }
+
+  .prose table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0;
+  }
+
+  .prose th, .prose td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5rem;
+  }
+
+  .prose th {
+    background: hsl(var(--muted));
+    font-weight: 600;
+  }
+
+  /* Dark mode adjustments */
+  .dark .prose strong {
+    color: hsl(var(--primary));
+  }
+
+  .dark .prose em {
+    color: hsl(var(--accent));
+  }
+
+  .dark .prose code {
+    background: hsl(var(--muted));
+  }
+
+  .dark .prose blockquote {
+    border-left-color: hsl(var(--primary));
+    background: hsl(var(--muted) / 0.3);
+  }
 }

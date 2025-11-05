@@ -177,15 +177,32 @@ RESPONSE_GENERATION_PROMPT = """Based on the authentic Islamic sources provided,
 5. **Acknowledge differences** - When applicable, present multiple scholarly views
 6. **Be practical** - Include practical guidance when relevant
 
-**Response Format:**
-- Start with a direct answer
-- Support with Quranic evidence (if available)
-- Include Hadith evidence (if available)
-- Add scholarly interpretation
-- Provide practical guidance
-- List all citations clearly
+**Response Format (Use Markdown):**
+- Start with a direct answer in a paragraph
+- Use **bold** for emphasis on key Islamic terms
+- Use proper headings (##, ###) to organize different sections
+- Use bullet points (-) or numbered lists (1., 2., 3.) for multiple points
+- Use > blockquotes for Quranic verses and Hadith quotations
+- Format citations clearly at the end
 
-Generate your response:"""
+**Example Structure:**
+## Direct Answer
+[Clear, concise answer]
+
+## Quranic Guidance
+> "[Quranic verse text]" (Surah Name X:Y)
+
+## Prophetic Guidance
+> [Hadith text] (Sahih Bukhari, Hadith #)
+
+## Scholarly Interpretation
+- Point 1
+- Point 2
+
+## Practical Guidance
+[Practical advice]
+
+Generate your response using proper markdown formatting:"""
 
 FIQH_GENERATION_PROMPT = """Based on the authentic Islamic sources provided, generate a comprehensive fiqh answer showing perspectives from multiple madhahib when applicable.
 
@@ -205,9 +222,32 @@ FIQH_GENERATION_PROMPT = """Based on the authentic Islamic sources provided, gen
 4. **Practical Guidance** - Explain how to apply the ruling
 5. **Citations** - Include specific source references
 
+**Response Format (Use Markdown):**
+- Use **bold** for key Islamic terms and rulings
+- Use ## headings to organize sections
+- Use bullet points or numbered lists for madhab differences
+- Use > blockquotes for Quranic verses and Hadith
+- Format madhab views clearly
+
+**Example Structure:**
+## Ruling Summary
+[Direct answer with ruling]
+
+## Evidence from Primary Sources
+> [Quranic verse or Hadith]
+
+## Views of the Four Madhahib
+- **Hanafi:** [View]
+- **Maliki:** [View]
+- **Shafi'i:** [View]
+- **Hanbali:** [View]
+
+## Practical Application
+[Step-by-step guidance]
+
 **Note:** If madhahib agree, state the consensus. If they differ, explain the differences respectfully.
 
-Generate your response:"""
+Generate your response using proper markdown formatting:"""
 
 AQIDAH_GENERATION_PROMPT = """Based on the Quran and authentic Hadith, provide a clear answer about this matter of Islamic belief.
 
@@ -223,7 +263,31 @@ AQIDAH_GENERATION_PROMPT = """Based on the Quran and authentic Hadith, provide a
 4. **Scholarly Consensus** - Note consensus among Sunni scholars
 5. **Practical Implications** - Explain how this belief affects practice
 
-Generate your response:"""
+**Response Format (Use Markdown):**
+- Use **bold** for key theological concepts
+- Use ## headings to organize sections
+- Use > blockquotes for Quranic verses and Hadith
+- Use bullet points or numbered lists for multiple points
+- Clearly separate foundational evidence from practical implications
+
+**Example Structure:**
+## Core Belief
+[Clear statement of the Islamic belief]
+
+## Quranic Foundation
+> "[Quranic verse]" (Surah Name X:Y)
+
+## Prophetic Guidance
+> [Hadith text] (Collection, Hadith #)
+
+## Scholarly Consensus
+[Explanation of scholarly agreement]
+
+## Practical Implications
+- How this belief affects daily practice
+- How it shapes a Muslim's worldview
+
+Generate your response using proper markdown formatting:"""
 
 # ============================================================================
 # Citation Formatting

@@ -14,6 +14,8 @@ from typing import Dict, Any, List
 import json
 import re
 
+from llama_index.core.llms import ChatMessage, MessageRole
+
 from backend.core.models import (
     RAGState,
     QuestionType,
@@ -56,9 +58,22 @@ def classify_query_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state: Current RAG state
         
     Returns:
-        Updated state with question_type
+        Updated state with question_type and user_query
     """
+    # Extract user query from either direct input or messages array
     user_query = state.get("user_query", "")
+    
+    if not user_query:
+        # Extract from messages array (when coming from LangGraph Server)
+        messages = state.get("messages", [])
+        if messages:
+            # Get the last user message
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    user_query = msg.get("content", "")
+                    break
+    
+    print(f"📝 Processing query: {user_query}")
     
     # Format classification prompt
     classification_prompt = format_prompt(
@@ -85,12 +100,14 @@ def classify_query_node(state: Dict[str, Any]) -> Dict[str, Any]:
         print(f"🔍 Query classified as: {question_type.value}")
         
         return {
+            "user_query": user_query,  # Ensure user_query is in state for subsequent nodes
             "question_type": question_type.value,
         }
     
     except Exception as e:
         print(f"❌ Classification error: {e}")
         return {
+            "user_query": user_query,
             "question_type": QuestionType.GENERAL.value,
         }
 
@@ -261,11 +278,16 @@ def rank_context_node(state: Dict[str, Any]) -> Dict[str, Any]:
             prioritize_authenticity=True,
         )
         
-        # Filter by score threshold
+        # Filter by score threshold, but keep at least top 3 documents
         filtered_docs = [
             doc for doc in ranked_docs 
             if doc.score is None or doc.score >= score_threshold
         ]
+        
+        # If filtering removed all docs, keep top 3 from ranked results
+        if not filtered_docs and ranked_docs:
+            print(f"⚠️ All docs below threshold {score_threshold}, keeping top 3 anyway")
+            filtered_docs = ranked_docs[:3]
         
         # Limit to max sources
         final_docs = filtered_docs[:max_sources]
@@ -331,37 +353,44 @@ def generate_response_node(state: Dict[str, Any]) -> Dict[str, Any]:
             )
             ranked_docs.append(doc)
         
+        # Check if we have ranked docs to use as context
         if not ranked_docs:
-            response = (
-                "I apologize, but I couldn't find relevant sources in the Islamic knowledge base "
-                "to answer your question. Please try rephrasing your question or ask about a different topic."
+            print(f"⚠️ No ranked docs available, generating without specific sources")
+            # Generate without context, with a disclaimer
+            no_context_prompt = f"""The user asked: "{user_query}"
+
+I couldn't find specific sources in my Islamic knowledge base for this query. 
+However, I will provide a general Islamic perspective based on well-known Islamic principles.
+
+Please provide a helpful response based on general Islamic knowledge, but include a disclaimer that specific sources couldn't be retrieved and the user should verify this information with scholars or authentic Islamic sources."""
+            
+            generation_prompt = no_context_prompt
+        else:
+            # Format context for LLM
+            context = format_context_for_llm(
+                documents=ranked_docs,
+                question_type=question_type,
+                max_sources=len(ranked_docs),
             )
-            return {"response": response}
-        
-        # Format context for LLM
-        context = format_context_for_llm(
-            documents=ranked_docs,
-            question_type=question_type,
-            max_sources=len(ranked_docs),
-        )
-        
-        # Get appropriate generation prompt
-        generation_prompt_template = get_generation_prompt(question_type)
-        
-        # Format generation prompt
-        generation_prompt = format_prompt(
-            generation_prompt_template,
-            user_query=user_query,
-            context=context,
-        )
+            
+            # Get appropriate generation prompt
+            generation_prompt_template = get_generation_prompt(question_type)
+            
+            # Format generation prompt
+            generation_prompt = format_prompt(
+                generation_prompt_template,
+                user_query=user_query,
+                context=context,
+            )
         
         # Get LLM
         llm = get_llm(backend=config.LLM_BACKEND)
         
-        # Create messages
+        # Create messages using ChatMessage objects
+        system_msg_dict = create_system_message(include_identity=True)
         messages = [
-            create_system_message(include_identity=True),
-            {"role": "user", "content": generation_prompt},
+            ChatMessage(role=MessageRole.SYSTEM, content=system_msg_dict["content"]),
+            ChatMessage(role=MessageRole.USER, content=generation_prompt),
         ]
         
         # Generate response

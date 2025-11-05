@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import { IslamicBookIcon } from "./IslamicDecorations";
 import type { ChatMessage } from "@/api/client";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message extends ChatMessage {
   id: string;
@@ -35,10 +37,10 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           </div>
 
           <div className="flex flex-col gap-2 flex-1">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <p className="text-sm whitespace-pre-wrap leading-relaxed m-0">
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-p:leading-relaxed prose-headings:mt-4 prose-headings:mb-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-strong:text-primary dark:prose-strong:text-primary prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:py-1">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {message.content}
-              </p>
+              </ReactMarkdown>
               {isStreaming && (
                 <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
               )}

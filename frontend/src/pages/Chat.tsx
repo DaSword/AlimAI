@@ -163,15 +163,26 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingMessage("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error);
+      
+      // Provide more specific error message
+      let errorContent = "Sorry, I encountered an error. Please try again.";
+      
+      if (error?.message?.includes("timeout")) {
+        errorContent = error.message;
+      } else if (error?.message) {
+        errorContent = `Error: ${error.message}`;
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I encountered an error. Please try again.",
+        content: errorContent,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+      setStreamingMessage("");
     } finally {
       setIsLoading(false);
     }

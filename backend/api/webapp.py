@@ -25,7 +25,11 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite and common dev ports
+    allow_origins=[
+        "http://localhost:5173",      # Vite dev server
+        "http://localhost:3000",      # Common dev port
+        "https://smith.langchain.com" # LangSmith Studio
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
