@@ -126,7 +126,7 @@ def run_dev_server(port: int = 8123, host: str = "0.0.0.0"):
     
     try:
         subprocess.run(
-            ["langgraph", "dev", "--port", str(port), "--no-browser"],
+            ["langgraph", "dev", "--port", str(port), "--no-browser", "--allow-blocking"],
             check=True
         )
     except subprocess.CalledProcessError as e:

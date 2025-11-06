@@ -22,10 +22,10 @@ config = Config()
 
 async def list_collections() -> Dict[str, Any]:
     """
-    List all Qdrant collections.
+    List all Qdrant collections with their statistics.
     
     Returns:
-        Dictionary with collection list
+        Dictionary with collection list including stats
     """
     try:
         manager = QdrantManager(collection_name="temp")
@@ -35,9 +35,57 @@ async def list_collections() -> Dict[str, Any]:
         
         collection_list = []
         for collection in collections.collections:
-            collection_list.append({
-                "name": collection.name,
-            })
+            # Get detailed stats for each collection
+            try:
+                info = manager.client.get_collection(collection.name)
+                
+                # Handle named vectors (e.g., "default") or direct vector config
+                vector_size = None
+                distance_metric = None
+                
+                if hasattr(info.config.params, 'vectors'):
+                    vectors_config = info.config.params.vectors
+                    # Check if it's a dict (named vectors) or direct config
+                    if isinstance(vectors_config, dict):
+                        # Named vectors - use the first one (usually "default")
+                        first_vector = next(iter(vectors_config.values()))
+                        vector_size = first_vector.size
+                        distance_metric = first_vector.distance.name
+                    else:
+                        # Direct vector config
+                        vector_size = vectors_config.size
+                        distance_metric = vectors_config.distance.name
+                
+                collection_list.append({
+                    "name": collection.name,
+                    "points_count": info.points_count or 0,
+                    "vectors_count": info.indexed_vectors_count or 0,
+                    "config": {
+                        "params": {
+                            "vectors": {
+                                "size": vector_size,
+                                "distance": distance_metric,
+                            }
+                        }
+                    },
+                    "status": info.status.name,
+                })
+            except Exception as e:
+                # If we can't get stats for a collection, add it with minimal info
+                collection_list.append({
+                    "name": collection.name,
+                    "points_count": 0,
+                    "vectors_count": 0,
+                    "config": {
+                        "params": {
+                            "vectors": {
+                                "size": None,
+                                "distance": None,
+                            }
+                        }
+                    },
+                    "status": "unknown",
+                })
         
         return {
             "success": True,
@@ -68,14 +116,31 @@ async def get_collection_stats(collection_name: str) -> Dict[str, Any]:
         # Get collection info
         info = manager.client.get_collection(collection_name)
         
+        # Handle named vectors (e.g., "default") or direct vector config
+        vector_size = None
+        distance_metric = None
+        
+        if hasattr(info.config.params, 'vectors') and info.config.params.vectors:
+            vectors_config = info.config.params.vectors
+            # Check if it's a dict (named vectors) or direct config
+            if isinstance(vectors_config, dict):
+                # Named vectors - use the first one (usually "default")
+                first_vector = next(iter(vectors_config.values()))
+                vector_size = first_vector.size
+                distance_metric = first_vector.distance.name
+            else:
+                # Direct vector config
+                vector_size = vectors_config.size
+                distance_metric = vectors_config.distance.name
+        
         stats = CollectionStats(
             collection_name=collection_name,
             status=info.status.name,
             points_count=info.points_count or 0,
             indexed_vectors_count=info.indexed_vectors_count or 0,
             segments_count=info.segments_count,
-            vector_size=info.config.params.vectors.size if info.config.params.vectors else None,
-            distance_metric=info.config.params.vectors.distance.name if info.config.params.vectors else None,
+            vector_size=vector_size,
+            distance_metric=distance_metric,
         )
         
         return {

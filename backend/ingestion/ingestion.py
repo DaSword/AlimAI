@@ -18,7 +18,7 @@ The pipeline supports all Islamic text types:
 """
 
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from pathlib import Path
 from datetime import datetime
 from llama_index.core import Document
@@ -257,6 +257,7 @@ class IngestionManager:
         source_type: Optional[SourceType] = None,
         collection_name: Optional[str] = None,
         batch_size: int = 100,
+        progress_callback: Optional[Callable[[float, str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Ingest a JSON file into the vector database with streaming/batching.
@@ -269,6 +270,8 @@ class IngestionManager:
             source_type: Type of source (auto-detected if None)
             collection_name: Qdrant collection name (uses default if None)
             batch_size: Number of documents to process per batch
+            progress_callback: Optional callback function(progress: float, message: str) 
+                             called with progress updates (0-100)
             
         Returns:
             Dictionary with ingestion statistics
@@ -327,6 +330,8 @@ class IngestionManager:
         # Stream and process batches
         for i in range(0, total_items, batch_size):
             batch_items = items[i:i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (total_items + batch_size - 1) // batch_size
             
             try:
                 # Create documents for this batch only
@@ -334,7 +339,7 @@ class IngestionManager:
                 batch_documents = self.json_to_documents(batch_data, source_type)
                 
                 if not batch_documents:
-                    logger.warning(f"No documents created for batch {i//batch_size + 1}")
+                    logger.warning(f"No documents created for batch {batch_num}")
                     continue
                 
                 # Run pipeline on this batch (parse, embed, store)
@@ -344,12 +349,18 @@ class IngestionManager:
                 
                 tracker.update(len(batch_items))
                 
+                # Report progress via callback
+                if progress_callback:
+                    progress = (i + len(batch_items)) / total_items * 100
+                    message = f"Processing batch {batch_num}/{total_batches} ({total_docs_processed}/{total_items} items)"
+                    progress_callback(progress, message)
+                
                 # Clear memory
                 del batch_documents
                 del nodes
                 
             except Exception as e:
-                logger.error(f"Error processing batch {i//batch_size + 1}: {e}")
+                logger.error(f"Error processing batch {batch_num}: {e}")
                 raise
         
         tracker.finish()

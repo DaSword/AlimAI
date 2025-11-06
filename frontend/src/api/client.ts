@@ -143,10 +143,36 @@ export interface ModelInfo {
   loaded: boolean;
 }
 
-export interface IngestionProgress {
-  status: "processing" | "completed" | "error";
+export interface IngestionTask {
+  task_id: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
   progress: number;
   message: string;
+  file_name: string;
+  collection_name: string;
+  source_type?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  queue_position?: number;
+  result?: {
+    source: string;
+    documents_processed: number;
+    nodes_created: number;
+    time_elapsed: number;
+    total_points: number;
+  };
+  error?: string;
+}
+
+export interface UploadResponse {
+  success: boolean;
+  task_id: string;
+  status: string;
+  message: string;
+  file_name: string;
+  collection_name: string;
+  error?: string;
 }
 
 // Admin API functions
@@ -154,11 +180,15 @@ export interface IngestionProgress {
 // Ingestion endpoints
 export async function uploadAndIngestFile(
   file: File,
-  sourceType: string
-): Promise<IngestionProgress> {
+  sourceType: string,
+  collectionName?: string
+): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("source_type", sourceType);
+  if (collectionName) {
+    formData.append("collection_name", collectionName);
+  }
 
   const response = await adminClient.post("/ingestion/upload", formData, {
     headers: {
@@ -168,9 +198,18 @@ export async function uploadAndIngestFile(
   return response.data;
 }
 
-export async function getIngestionStatus(taskId: string): Promise<IngestionProgress> {
+export async function getIngestionStatus(taskId: string): Promise<IngestionTask> {
   const response = await adminClient.get(`/ingestion/status/${taskId}`);
   return response.data;
+}
+
+export async function listIngestionTasks(limit: number = 50): Promise<IngestionTask[]> {
+  const response = await adminClient.get(`/ingestion/tasks?limit=${limit}`);
+  return response.data.tasks || [];
+}
+
+export async function cancelIngestionTask(taskId: string): Promise<void> {
+  await adminClient.post(`/ingestion/tasks/${taskId}/cancel`);
 }
 
 // Collection endpoints

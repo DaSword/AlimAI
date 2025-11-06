@@ -45,18 +45,32 @@ class QdrantManager:
         self.vector_size = vector_size or Config.VECTOR_SIZE
         self.base_url = f"{self.url}/collections/{self.collection_name}"
         
-        # Initialize Qdrant client for LlamaIndex integration
-        # Extract host and port from URL
-        url_parts = self.url.replace('http://', '').replace('https://', '').split(':')
-        host = url_parts[0]
-        port = int(url_parts[1]) if len(url_parts) > 1 else 6333
+        # Lazy initialization for client (to avoid blocking I/O in __init__)
+        self._client = None
+        self._host = None
+        self._port = None
         
-        try:
-            self.client = QdrantClient(host=host, port=port)
-            logger.info(f"Initialized Qdrant client: {host}:{port}")
-        except Exception as e:
-            logger.warning(f"Could not initialize Qdrant client: {e}")
-            self.client = None
+        # Extract host and port from URL for lazy initialization
+        url_parts = self.url.replace('http://', '').replace('https://', '').split(':')
+        self._host = url_parts[0]
+        self._port = int(url_parts[1]) if len(url_parts) > 1 else 6333
+    
+    @property
+    def client(self) -> Optional[QdrantClient]:
+        """
+        Lazy initialization of Qdrant client.
+        
+        Returns:
+            QdrantClient instance or None if initialization fails
+        """
+        if self._client is None:
+            try:
+                self._client = QdrantClient(host=self._host, port=self._port)
+                logger.info(f"Initialized Qdrant client: {self._host}:{self._port}")
+            except Exception as e:
+                logger.warning(f"Could not initialize Qdrant client: {e}")
+                return None
+        return self._client
     
     def get_vector_store(self, collection_name: Optional[str] = None) -> QdrantVectorStore:
         """
