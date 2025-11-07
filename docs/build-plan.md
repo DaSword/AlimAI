@@ -70,67 +70,80 @@ None - this is the foundation for all other stages. -->
 
 ---
 
-<!-- ## Stage 3: Ollama Integration & Model Setup ✅ COMPLETED
+<!-- ## Stage 3: llama.cpp Integration & Model Setup ✅ COMPLETED
 
-**Goal:** Replace sentence-transformers with Ollama-based embedding service and set up LLM.
+**Goal:** Set up native llama.cpp servers for embeddings, chat, and reranking with local GGUF models.
 
 ### Tasks
 
 #### Technical
-- [x] Create `backend/embeddings_service.py` with Ollama via LlamaIndex
-  - ✅ Uses LlamaIndex `OllamaEmbedding` wrapper
-  - ✅ Support batch embedding generation
-  - ✅ Maintains interface compatibility with old `EmbeddingsManager`
-  - ✅ Fallback to sentence-transformers if needed
-- [x] Create `backend/llm_service.py` for chat completions
-  - ✅ Uses LlamaIndex `Ollama` LLM wrapper
-  - ✅ Support streaming responses
-  - ✅ Handle context window management
-  - ✅ Graceful error handling for memory constraints
-- [x] Create `backend/reranker_service.py`
-  - ✅ Uses LlamaIndex `LLMRerank` postprocessor
-  - ✅ LLM-based reranking following LlamaIndex best practices
-  - ✅ Graceful fallback when memory limited
-- [x] Create `backend/llama_config.py`
-  - ✅ Centralized LlamaIndex configuration
+- [x] Download GGUF models to `models/` directory:
+  - ✅ `embeddinggemma-300m-qat-Q4_K_M.gguf` (302M params, 225 MB)
+  - ✅ `Qwen3-8B-Q4_K_M.gguf` (8.2B params, 4.7 GB)
+  - ✅ `Qwen3-Reranker-0.6B-Q4_K_M.gguf` (595M params, 378 MB)
+- [x] Create `llamacpp-manager.sh` script for server management:
+  - ✅ Start/stop/restart commands for all servers
+  - ✅ Health checks and status monitoring
+  - ✅ Testing endpoints (embeddings, chat, reranker)
+  - ✅ Streaming chat support
+  - ✅ Log management
+- [x] Set up three llama.cpp servers:
+  - ✅ Embeddings server (port 8001) - 768 dimensions
+  - ✅ Chat server (port 8002) - OpenAI-compatible with Jinja templates
+  - ✅ Reranker server (port 8003) - search result reranking
+- [x] Create `backend/llama/llama_config.py`:
+  - ✅ Multi-backend configuration (HuggingFace, llama.cpp, LM Studio)
   - ✅ Helper functions for getting LLM and embeddings
-  - ✅ Model availability checking utilities
-- [x] Update `docker-compose.yml` with Ollama service
+  - ✅ Connection checking utilities
+  - ✅ Proper timeout handling
+- [x] Create backend service wrappers:
+  - ✅ `backend/llama/embeddings_service.py` - Multi-backend support
+  - ✅ `backend/llama/llm_service.py` - Multi-backend LLM with streaming
+  - ✅ `backend/llama/reranker_service.py` - LLMRerank implementation
 
 #### Non-Technical
-- [x] Download and test Ollama models:
-  - ✅ `nomic-embed-text:latest` (embedding - 768 dimensions)
-  - ✅ `qwen2.5:3b` (chat - memory efficient)
-  - ✅ `embeddinggemma:latest` (alternative embedding model)
-  - ✅ Tested reranking with LLM (no dedicated reranker needed)
+- [x] Model downloads and verification:
+  - ✅ All GGUF models downloaded and tested
+  - ✅ Q4_K_M quantization for optimal speed/quality balance
+  - ✅ Native ARM64 execution on Apple Silicon
+  - ✅ Performance: ~25 tokens/sec (chat), ~0.2s per request (embeddings)
 
 ### Deliverables
-- ✅ `backend/embeddings_service.py` - LlamaIndex OllamaEmbedding wrapper
-- ✅ `backend/llm_service.py` - LlamaIndex Ollama LLM wrapper  
-- ✅ `backend/reranker_service.py` - LlamaIndex LLMRerank implementation
-- ✅ `backend/llama_config.py` - LlamaIndex global configuration
-- ✅ `example_chat.py` - Demonstrates Chat Engines usage
-- ✅ Models downloaded and tested
+- ✅ `llamacpp-manager.sh` - Complete server management script (486 lines)
+- ✅ `docs/LLAMACPP_MANAGER.md` - Comprehensive usage documentation (247 lines)
+- ✅ Three running llama.cpp servers with OpenAI-compatible APIs
+- ✅ `backend/llama/llama_config.py` - Multi-backend configuration (515 lines)
+- ✅ `backend/llama/embeddings_service.py` - Multi-backend embeddings wrapper
+- ✅ `backend/llama/llm_service.py` - Multi-backend LLM wrapper with streaming
+- ✅ `backend/llama/reranker_service.py` - LlamaIndex LLMRerank implementation
+- ✅ `models/` directory with all GGUF files (~5.3 GB total)
 
 ### Acceptance Criteria
-- [x] `embeddings_service.py` generates embeddings via Ollama API
-- [x] Embedding generation completes in reasonable time (<5s for 100 texts)
-- [x] `llm_service.py` generates chat completions via Ollama
-- [x] All models load successfully on `docker-compose up`
-- [x] Reranker uses LlamaIndex LLMRerank following best practices
-- [x] All services follow LlamaIndex patterns and conventions
-- [x] Graceful fallback handling for memory constraints
-- [x] Backward compatibility maintained
+- [x] All three llama.cpp servers start successfully
+- [x] Embeddings server generates 768-dimensional vectors
+- [x] Chat server responds with streaming support
+- [x] Reranker server ranks search results
+- [x] Manager script handles all operations (start/stop/status/test)
+- [x] Health checks verify all services are operational
+- [x] Models run natively on Apple Silicon (ARM64)
+- [x] OpenAI-compatible API endpoints work correctly
+- [x] Backend services support multiple backends (HuggingFace/llama.cpp/LM Studio)
+- [x] Proper timeout handling prevents hanging requests
+- [x] All services follow LlamaIndex patterns
 
 ### Dependencies
-- Stage 1 (Ollama service running) ✅
-- Stage 2 (backend structure in place) ✅
+- Stage 1 (Infrastructure) ✅
+- Stage 2 (Backend structure in place) ✅
 
 ### Notes
-- Using `embeddinggemma:latest` instead of Qwen embedding (better performance)
-- Using `qwen2.5:3b` instead of `qwen3:4b` (more memory efficient)
-- Reranker uses LLM-based approach via `LLMRerank`
-- All implementations follow LlamaIndex official documentation and examples -->
+- **Architecture Change:** Migrated from Ollama to native llama.cpp servers for better performance
+- Using Q4_K_M quantized GGUF models for optimal memory/quality trade-off
+- Native ARM64 execution provides ~25 tokens/sec for chat
+- Total RAM usage: ~6-7 GB for all three servers
+- OpenAI-compatible APIs enable easy integration with LlamaIndex
+- Manager script provides production-ready service management
+- Chat model supports special commands: `/no_think` (fast), `/think` (reasoning)
+- All implementations follow LlamaIndex official documentation -->
 
 ---
 
@@ -334,66 +347,158 @@ None - this is the foundation for all other stages. -->
 
 ---
 
-## Stage 6: Frontend Development
+## Stage 6: Frontend Development ✅ COMPLETED
 
-**Goal:** Build React admin panel and chat interface connected to LangGraph Server.
+**Goal:** Build React admin panel and chat interface connected to backend API.
+
+**Date Completed:** November 2025
 
 ### Tasks
 
 #### Technical
-- [ ] Initialize Vite + React app in `frontend/`
-- [ ] Install dependencies:
-  - `react-router-dom` (routing)
-  - `@langchain/langgraph-sdk` (LangGraph client)
-  - `axios` (API client for admin endpoints)
-  - `tailwindcss` (styling)
-- [ ] Create `frontend/src/api/client.js` API client:
-  - LangGraph SDK client for chat
-  - Axios client for admin endpoints
-  - Handle streaming responses
-  - Thread/conversation management
-- [ ] Create `frontend/src/App.jsx` with routing:
-  - `/` - Chat interface
-  - `/admin` - Admin dashboard
-- [ ] Create `frontend/src/pages/Chat.jsx`:
-  - Message history display with conversation threads
-  - Chat input box
-  - Real-time streaming response rendering
-  - Source citations for each response
-  - Thread management (new conversation, continue thread)
-- [ ] Create `frontend/src/pages/Admin.jsx` with tabs:
-  - Ingestion tab
-  - Collections tab
-  - Models tab
-- [ ] Create admin components:
-  - `components/admin/IngestionPanel.jsx` - Upload/ingest files
-  - `components/admin/CollectionManager.jsx` - Manage Qdrant collections
-  - `components/admin/ModelStatus.jsx` - Check Ollama models
-- [ ] Integrate with LangGraph Server API:
-  - `POST /runs/stream` - Main chat endpoint with streaming
-  - `POST /threads` - Create new conversation thread
-  - `GET /threads/{thread_id}/history` - Get conversation history
-- [ ] Configure CORS in LangGraph Server for local development
+- [x] Initialize Vite + React + TypeScript app in `frontend/`
+- [x] Install dependencies:
+  - ✅ `react-router-dom` (routing)
+  - ✅ `@langchain/langgraph-sdk` (LangGraph client)
+  - ✅ `axios` (API client for admin endpoints)
+  - ✅ `tailwindcss` (styling)
+  - ✅ `lucide-react` (icons)
+  - ✅ `class-variance-authority` (component variants)
+- [x] Create `frontend/src/api/client.ts` API client:
+  - ✅ LangGraph SDK client for chat operations
+  - ✅ Axios client for admin endpoints
+  - ✅ Handle streaming responses
+  - ✅ Thread/conversation management
+  - ✅ Type-safe interfaces with TypeScript
+- [x] Create `frontend/src/App.tsx` with routing:
+  - ✅ `/` - Chat interface (default route)
+  - ✅ Theme system initialization
+  - ✅ BrowserRouter setup
+- [x] Create `frontend/src/pages/Chat.tsx`:
+  - ✅ Message history display with conversation threads
+  - ✅ Chat input box with auto-resize
+  - ✅ Real-time streaming response rendering
+  - ✅ Source citations for each response
+  - ✅ Thread management (new conversation, continue thread)
+  - ✅ Sidebar with conversation list
+  - ✅ Settings and admin modals
+  - ✅ Islamic-themed design with decorative elements
+- [x] Create admin components:
+  - ✅ `components/admin/IngestionPanel.tsx` - Upload/ingest files with progress tracking
+  - ✅ `components/admin/CollectionManager.tsx` - Manage Qdrant collections (list, clear, delete)
+  - ✅ `components/admin/ModelStatus.tsx` - Check llama.cpp server models and health
+  - ✅ `components/chat/AdminModal.tsx` - Tabbed admin interface
+  - ✅ `components/chat/SettingsModal.tsx` - User settings and theme selection
+- [x] Create chat interface components:
+  - ✅ `components/chat/ChatSidebar.tsx` - Collapsible sidebar with threads
+  - ✅ `components/chat/ChatInput.tsx` - Auto-resizing text input
+  - ✅ `components/chat/MessageBubble.tsx` - Message display with citations
+  - ✅ `components/chat/WelcomeScreen.tsx` - Initial screen with quick actions
+  - ✅ `components/chat/IslamicDecorations.tsx` - SVG decorative elements
+- [x] Create reusable UI components:
+  - ✅ `components/ui/button.tsx` - Button with variants
+  - ✅ `components/ui/card.tsx` - Card container components
+  - ✅ `components/ui/input.tsx` - Text input
+  - ✅ `components/ui/textarea.tsx` - Multi-line input
+  - ✅ `components/ui/tabs.tsx` - Tabbed interface
+- [x] Implement comprehensive theming system:
+  - ✅ Dark/Light/System theme modes
+  - ✅ Islamic-inspired color palette (emerald, gold, teal)
+  - ✅ CSS custom properties for runtime theme switching
+  - ✅ Persistent theme preferences (localStorage)
+  - ✅ Islamic geometric patterns and decorations
+- [x] Integrate with backend API:
+  - ✅ Chat endpoints via LangGraph SDK
+  - ✅ Admin endpoints via Axios
+  - ✅ CORS configuration in backend
+  - ✅ Environment variable configuration
+- [x] Configure CORS in backend for local development
 
 ### Deliverables
-- Complete React frontend with chat and admin interfaces
-- LangGraph SDK integration for chat
-- Admin API client
-- Connected full-stack application
+- ✅ Complete React + TypeScript frontend with chat and admin interfaces (~2,800+ lines of code)
+- ✅ LangGraph SDK integration for chat operations
+- ✅ Admin API client for management operations
+- ✅ Connected full-stack application
+- ✅ Islamic-themed design system with custom components
+- ✅ Comprehensive theme system (dark/light/system)
+- ✅ Production-ready build configuration
 
 ### Acceptance Criteria
-- [ ] Chat interface sends messages via LangGraph SDK
-- [ ] Streaming responses display in real-time
-- [ ] Source citations render properly with references
-- [ ] Conversation threads persist and can be resumed
-- [ ] Admin panel can upload JSON files
-- [ ] Ingestion panel shows progress and success/error messages
-- [ ] Collections tab lists all Qdrant collections with stats
-- [ ] Models tab shows loaded Ollama models
-- [ ] No CORS errors when frontend calls LangGraph Server
+- [x] Chat interface sends messages via LangGraph SDK
+- [x] Streaming responses display in real-time
+- [x] Source citations render properly with references
+- [x] Conversation threads persist and can be resumed
+- [x] Admin panel can upload JSON files
+- [x] Ingestion panel shows progress and success/error messages
+- [x] Collections tab lists all Qdrant collections with stats
+- [x] Models tab shows loaded llama.cpp server models
+- [x] No CORS errors when frontend calls backend
+- [x] Theme switching works seamlessly
+- [x] Responsive design works on different screen sizes
+- [x] TypeScript provides full type safety
+- [x] Build process creates optimized production bundle
+
+### Key Features Implemented
+
+**Chat Interface:**
+- Real-time streaming responses with typing indicators
+- Source citations with book, reference, and text excerpts
+- Conversation thread management
+- Auto-scrolling to latest messages
+- Islamic decorative elements (Bismillah, geometric patterns)
+- Quick action cards for common queries
+
+**Admin Panel:**
+- File upload with source type selection (Quran, Hadith, Tafsir, Fiqh, Seerah, Aqidah)
+- Collection management (list, clear, delete, view stats)
+- Model status monitoring (embeddings, chat, reranker servers)
+- Health checks for all backend services
+- Progress tracking for ingestion operations
+
+**Design System:**
+- Islamic color palette (emerald green, gold, teal)
+- Custom UI components with variants
+- Dark/light theme support
+- Arabic typography support (Amiri, Scheherazade New fonts)
+- Geometric patterns and ornamental elements
+- Responsive layout with collapsible sidebar
+
+**Technical Stack:**
+- React 18.2.0 + TypeScript
+- Vite 5.0.8 (build tool)
+- Tailwind CSS 3.4.0 (styling)
+- React Router DOM 6.21.0 (routing)
+- LangGraph SDK (chat operations)
+- Axios (admin API calls)
+- Lucide React (icons)
+
+### Files Created (Frontend)
+- `frontend/src/App.tsx` - Root component with routing
+- `frontend/src/main.tsx` - Application entry point
+- `frontend/src/pages/Chat.tsx` - Main chat page (450+ lines)
+- `frontend/src/api/client.ts` - API client with TypeScript types
+- `frontend/src/components/chat/` - 8 chat components
+- `frontend/src/components/admin/` - 3 admin components
+- `frontend/src/components/ui/` - 5 reusable UI components
+- `frontend/src/index.css` - Global styles and theme definitions
+- `frontend/tailwind.config.js` - Tailwind configuration
+- `frontend/vite.config.ts` - Vite build configuration
+- `frontend/tsconfig*.json` - TypeScript configuration files
+- `frontend/package.json` - Dependencies and scripts
+
+### Architecture Improvements
+- **Type Safety:** Full TypeScript implementation with interfaces for all data structures
+- **Component Architecture:** Modular, reusable components with clear separation of concerns
+- **State Management:** React hooks with proper state lifting and prop drilling patterns
+- **API Abstraction:** Centralized API client with typed request/response interfaces
+- **Theme System:** CSS custom properties enable runtime theme switching without rebuilds
+- **Build Optimization:** Vite provides fast dev server and optimized production builds
 
 ### Dependencies
-- Stage 5 (LangGraph Server with RAG workflow)
+- Stage 5 (Backend API with admin endpoints) ✅
+- llama.cpp servers running (embeddings, chat, reranker) ✅
+
+**Total Frontend Output:** ~2,800+ lines of TypeScript/TSX across 25+ files
 
 ---
 
@@ -749,15 +854,15 @@ None - this is the foundation for all other stages. -->
 ## Progress Tracking
 
 ### Current Stage
-**Stage 6** - Frontend Development
+**Stage 7** - Tier 1 Data Acquisition & Ingestion
 
 ### Completion Status
 - [x] Stage 1: Environment Setup & Infrastructure ✅
 - [x] Stage 2: Backend Core Structure ✅
-- [x] Stage 3: Ollama Integration & Model Setup ✅
+- [x] Stage 3: llama.cpp Integration & Model Setup ✅
 - [x] Stage 4: Enhanced Data Schema & Ingestion Pipeline ✅
 - [x] Stage 5: RAG Retrieval System (LangGraph Server) ✅ **COMPLETED October 28, 2025**
-- [ ] Stage 6: Frontend Development
+- [x] Stage 6: Frontend Development ✅ **COMPLETED November 7, 2025**
 - [ ] Stage 7: Tier 1 Data Acquisition & Ingestion
 - [ ] Stage 8: Testing & Refinement
 - [ ] Stage 9: Tier 2 & 3 Expansion (Future)
