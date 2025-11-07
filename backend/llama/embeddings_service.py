@@ -21,6 +21,7 @@ class EmbeddingsService:
     Service class for generating text embeddings.
     
     Supports multiple backends:
+    - Llama.cpp (OpenAI-compatible API)
     - HuggingFace/SentenceTransformers (fast, local, batched)
     - Ollama API (flexible, model variety)
     """
@@ -35,7 +36,7 @@ class EmbeddingsService:
         Initialize EmbeddingsService.
         
         Args:
-            embedding_backend: Embedding backend ('huggingface' or 'ollama', defaults to config)
+            embedding_backend: Embedding backend ('llamacpp', 'huggingface' or 'ollama', defaults to config)
             model_name: Embedding model name (defaults to config based on backend)
             device: Device for HuggingFace embeddings ('cuda' or 'cpu', auto-detects if None)
         """
@@ -57,7 +58,31 @@ class EmbeddingsService:
             True if model loaded successfully, False otherwise
         """
         try:
-            if self.embedding_backend == "huggingface":
+            if self.embedding_backend == "llamacpp":
+                from llama_index.embeddings.openai import OpenAIEmbedding
+                from llama_index.embeddings.openai.base import OpenAIEmbeddingMode
+                
+                self.model_name = self.model_name or config.LLAMACPP_EMBEDDING_MODEL
+                logger.info(f"Loading Llama.cpp embedding model: {self.model_name}")
+                logger.info(f"Llama.cpp URL: {config.LLAMACPP_EMBEDDING_URL}")
+                
+                # For Llama.cpp with custom models, use SIMILARITY_MODE
+                self.embedding_model = OpenAIEmbedding(
+                    model_name=self.model_name,
+                    api_base=config.LLAMACPP_EMBEDDING_URL,
+                    api_key="llama-cpp",  # Llama.cpp doesn't require a real API key
+                    mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+                )
+                
+                # Test embedding to detect vector dimensions
+                test_embedding = self.embedding_model.get_text_embedding("test")
+                self.vector_size = len(test_embedding)
+                
+                logger.info("✓ Llama.cpp embedding model loaded successfully")
+                logger.info(f"✓ Vector dimensions: {self.vector_size}")
+                return True
+            
+            elif self.embedding_backend == "huggingface":
                 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
                 
                 self.model_name = self.model_name or config.EMBEDDING_MODEL
@@ -141,12 +166,14 @@ class EmbeddingsService:
             
             else:
                 logger.error(f"Unknown embedding backend: {self.embedding_backend}")
-                logger.error("  Use 'huggingface', 'ollama', or 'lmstudio'")
+                logger.error("  Use 'llamacpp', 'huggingface', 'ollama', or 'lmstudio'")
                 return False
             
         except ImportError as e:
             logger.error(f"Required package not installed: {str(e)}")
-            if self.embedding_backend == "huggingface":
+            if self.embedding_backend == "llamacpp":
+                logger.error("  Install with: pip install llama-index-embeddings-openai")
+            elif self.embedding_backend == "huggingface":
                 logger.error("  Install with: pip install llama-index-embeddings-huggingface sentence-transformers")
             else:
                 logger.error("  Install with: pip install llama-index-embeddings-ollama")

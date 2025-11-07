@@ -11,7 +11,13 @@ Provides endpoints for:
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from typing import Dict, Any, List
 
-from .models_api import get_health_status, list_ollama_models, pull_ollama_model, get_models_status
+from .models_api import (
+    get_health_status,
+    list_ollama_models,
+    pull_ollama_model,
+    get_models_status,
+    list_llamacpp_models,
+)
 from .collection_api import (
     list_collections,
     get_collection_stats,
@@ -59,11 +65,23 @@ async def health_check() -> Dict[str, Any]:
 @router.get("/models")
 async def list_models() -> List[Dict[str, Any]]:
     """
-    List all available Ollama models.
+    List all available models (llama.cpp or Ollama based on configured backend).
     
     Returns:
-        List of models with name, size, and loaded status
+        List of models with name, type, and status
     """
+    from backend.core.config import config
+    
+    # Return llama.cpp models if that's the configured backend
+    if config.LLM_BACKEND == "llamacpp" or config.EMBEDDING_BACKEND == "llamacpp":
+        result = await list_llamacpp_models()
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch models"))
+        
+        return result.get("models", [])
+    
+    # Fall back to Ollama models
     result = await list_ollama_models()
     
     if not result.get("success"):

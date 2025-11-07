@@ -25,18 +25,22 @@ def configure_llama_index(
     llm_model: Optional[str] = None,
     ollama_url: Optional[str] = None,
     lmstudio_url: Optional[str] = None,
+    llamacpp_embedding_url: Optional[str] = None,
+    llamacpp_chat_url: Optional[str] = None,
     device: Optional[str] = None
 ) -> None:
     """
     Configure LlamaIndex global settings with flexible embedding and LLM backends.
     
     Args:
-        embedding_backend: Embedding backend ('huggingface', 'ollama', or 'lmstudio', defaults to config)
+        embedding_backend: Embedding backend ('huggingface', 'llamacpp', 'ollama', or 'lmstudio', defaults to config)
         embedding_model: Embedding model name (defaults to config based on backend)
-        llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+        llm_backend: LLM backend ('llamacpp', 'ollama' or 'lmstudio', defaults to config)
         llm_model: LLM model name (defaults to config based on backend)
         ollama_url: Ollama service URL (defaults to config)
         lmstudio_url: LM Studio service URL (defaults to config)
+        llamacpp_embedding_url: Llama.cpp embedding server URL (defaults to config)
+        llamacpp_chat_url: Llama.cpp chat server URL (defaults to config)
         device: Device for HuggingFace embeddings ('cuda' or 'cpu', auto-detects if None)
     """
     # Use config defaults if not specified
@@ -44,6 +48,8 @@ def configure_llama_index(
     llm_backend = llm_backend or config.LLM_BACKEND
     ollama_url = ollama_url or config.OLLAMA_URL
     lmstudio_url = lmstudio_url or config.LMSTUDIO_URL
+    llamacpp_embedding_url = llamacpp_embedding_url or config.LLAMACPP_EMBEDDING_URL
+    llamacpp_chat_url = llamacpp_chat_url or config.LLAMACPP_CHAT_URL
     
     logger.info("Configuring LlamaIndex...")
     logger.info(f"  Embedding Backend: {embedding_backend}")
@@ -96,6 +102,23 @@ def configure_llama_index(
             )
             logger.info("✓ Using Ollama API embeddings")
             
+        elif embedding_backend == "llamacpp":
+            from llama_index.embeddings.openai import OpenAIEmbedding
+            from llama_index.embeddings.openai.base import OpenAIEmbeddingMode
+            
+            embedding_model = embedding_model or config.LLAMACPP_EMBEDDING_MODEL
+            logger.info(f"  Embedding Model: {embedding_model}")
+            logger.info(f"  Llama.cpp URL: {llamacpp_embedding_url}")
+            
+            # Configure Llama.cpp embeddings (OpenAI-compatible API)
+            embed_model = OpenAIEmbedding(
+                model_name=embedding_model,
+                api_base=llamacpp_embedding_url,
+                api_key="llama-cpp",  # Llama.cpp doesn't require a real API key
+                mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+            )
+            logger.info("✓ Using Llama.cpp embeddings (OpenAI-compatible)")
+            
         elif embedding_backend == "lmstudio":
             from llama_index.embeddings.openai import OpenAIEmbedding
             from llama_index.embeddings.openai.base import OpenAIEmbeddingMode
@@ -115,10 +138,26 @@ def configure_llama_index(
             logger.info("✓ Using LM Studio embeddings (OpenAI-compatible)")
             
         else:
-            raise ValueError(f"Unknown embedding backend: {embedding_backend}. Use 'huggingface', 'ollama', or 'lmstudio'")
+            raise ValueError(f"Unknown embedding backend: {embedding_backend}. Use 'huggingface', 'llamacpp', 'ollama', or 'lmstudio'")
         
         # Configure LLM based on backend
-        if llm_backend == "ollama":
+        if llm_backend == "llamacpp":
+            from llama_index.llms.openai import OpenAI
+            
+            llm_model = llm_model or config.LLAMACPP_CHAT_MODEL
+            logger.info(f"  LLM Model: {llm_model} (Llama.cpp)")
+            logger.info(f"  Llama.cpp URL: {llamacpp_chat_url}")
+            
+            llm = OpenAI(
+                model=llm_model,
+                api_base=llamacpp_chat_url,
+                api_key="llama-cpp",  # Llama.cpp doesn't require a real API key
+                temperature=0.7,
+                timeout=config.LLAMACPP_REQUEST_TIMEOUT,
+            )
+            logger.info("✓ Using Llama.cpp LLM (OpenAI-compatible)")
+            
+        elif llm_backend == "ollama":
             from llama_index.llms.ollama import Ollama
             
             llm_model = llm_model or config.OLLAMA_CHAT_MODEL
@@ -148,7 +187,7 @@ def configure_llama_index(
             logger.info("✓ Using LM Studio LLM")
             
         else:
-            raise ValueError(f"Unknown LLM backend: {llm_backend}. Use 'ollama' or 'lmstudio'")
+            raise ValueError(f"Unknown LLM backend: {llm_backend}. Use 'llamacpp', 'ollama' or 'lmstudio'")
         
         # Set global defaults
         Settings.embed_model = embed_model
@@ -173,7 +212,7 @@ def get_embed_model(
     Get a configured embedding model instance based on backend.
     
     Args:
-        embedding_backend: Embedding backend ('huggingface', 'ollama', or 'lmstudio', defaults to config)
+        embedding_backend: Embedding backend ('huggingface', 'llamacpp', 'ollama', or 'lmstudio', defaults to config)
         model_name: Embedding model name (defaults to config based on backend)
         device: Device for HuggingFace embeddings ('cuda' or 'cpu', auto-detects if None)
         
@@ -207,6 +246,19 @@ def get_embed_model(
         
         return HuggingFaceEmbedding(**embed_model_kwargs)
     
+    elif embedding_backend == "llamacpp":
+        from llama_index.embeddings.openai import OpenAIEmbedding
+        from llama_index.embeddings.openai.base import OpenAIEmbeddingMode
+        
+        model_name = model_name or config.LLAMACPP_EMBEDDING_MODEL
+        
+        return OpenAIEmbedding(
+            model_name=model_name,
+            api_base=config.LLAMACPP_EMBEDDING_URL,
+            api_key="llama-cpp",
+            mode=OpenAIEmbeddingMode.SIMILARITY_MODE,
+        )
+    
     elif embedding_backend == "ollama":
         from llama_index.embeddings.ollama import OllamaEmbedding
         
@@ -232,7 +284,7 @@ def get_embed_model(
         )
     
     else:
-        raise ValueError(f"Unknown embedding backend: {embedding_backend}. Use 'huggingface', 'ollama', or 'lmstudio'")
+        raise ValueError(f"Unknown embedding backend: {embedding_backend}. Use 'huggingface', 'llamacpp', 'ollama', or 'lmstudio'")
 
 
 def get_llm(
@@ -246,18 +298,34 @@ def get_llm(
     Get a configured LLM instance based on backend.
     
     Args:
-        llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+        llm_backend: LLM backend ('llamacpp', 'ollama' or 'lmstudio', defaults to config)
         model: LLM model name (defaults to config based on backend)
         base_url: Service URL (defaults to config based on backend)
         temperature: Sampling temperature (0.0 to 1.0)
         **kwargs: Additional arguments for the LLM
         
     Returns:
-        Configured LLM instance (Ollama or LMStudio)
+        Configured LLM instance (OpenAI, Ollama or LMStudio)
     """
     llm_backend = llm_backend or config.LLM_BACKEND
     
-    if llm_backend == "ollama":
+    if llm_backend == "llamacpp":
+        from llama_index.llms.openai import OpenAI
+        
+        model = model or config.LLAMACPP_CHAT_MODEL
+        model = "gpt-3.5-turbo"
+        base_url = base_url or config.LLAMACPP_CHAT_URL
+        
+        return OpenAI(
+            model=model,
+            api_base=base_url,
+            api_key="llama-cpp",
+            temperature=temperature,
+            timeout=config.LLAMACPP_REQUEST_TIMEOUT,
+            **kwargs
+        )
+    
+    elif llm_backend == "ollama":
         from llama_index.llms.ollama import Ollama
         
         model = model or config.OLLAMA_CHAT_MODEL
@@ -287,7 +355,43 @@ def get_llm(
         )
     
     else:
-        raise ValueError(f"Unknown LLM backend: {llm_backend}. Use 'ollama' or 'lmstudio'")
+        raise ValueError(f"Unknown LLM backend: {llm_backend}. Use 'llamacpp', 'ollama' or 'lmstudio'")
+
+
+def check_llamacpp_connection(service_type: str = "chat") -> bool:
+    """
+    Check if llama.cpp service is reachable.
+    
+    Args:
+        service_type: Type of service to check ('chat', 'embeddings', or 'reranker')
+    
+    Returns:
+        True if llama.cpp service is reachable, False otherwise
+    """
+    import httpx
+    
+    # Map service type to URL
+    url_map = {
+        "chat": config.LLAMACPP_CHAT_URL,
+        "embeddings": config.LLAMACPP_EMBEDDING_URL,
+        "reranker": config.LLAMACPP_RERANKER_URL,
+    }
+    
+    base_url = url_map.get(service_type, config.LLAMACPP_CHAT_URL)
+    
+    try:
+        # Try to get models endpoint (OpenAI-compatible API)
+        response = httpx.get(f"{base_url}/models", timeout=5.0)
+        if response.status_code == 200:
+            logger.info(f"Llama.cpp {service_type} service is reachable at {base_url}")
+            return True
+        else:
+            logger.warning(f"Llama.cpp returned status code: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"Cannot reach llama.cpp {service_type} service: {str(e)}")
+        logger.error(f"   Make sure llama.cpp server is running at {base_url}")
+        return False
 
 
 def check_ollama_connection() -> bool:

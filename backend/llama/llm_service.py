@@ -37,7 +37,8 @@ class LLMService:
     Simplified service for direct LLM completions via LlamaIndex.
     
     Supports multiple backends:
-    - Ollama (default)
+    - Llama.cpp (default, OpenAI-compatible)
+    - Ollama
     - LM Studio (local server)
     
     Use this when you need:
@@ -63,7 +64,7 @@ class LLMService:
         Initialize LLMService.
         
         Args:
-            llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+            llm_backend: LLM backend ('llamacpp', 'ollama' or 'lmstudio', defaults to config)
             model: LLM model name (defaults to config based on backend)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
@@ -72,7 +73,10 @@ class LLMService:
         self.llm_backend = llm_backend or config.LLM_BACKEND
         
         # Set model name based on backend
-        if self.llm_backend == "lmstudio":
+        if self.llm_backend == "llamacpp":
+            self.model_name = model or config.LLAMACPP_CHAT_MODEL
+            self.max_tokens = max_tokens or config.LLAMACPP_MAX_TOKENS
+        elif self.llm_backend == "lmstudio":
             self.model_name = model or config.LMSTUDIO_CHAT_MODEL
             self.max_tokens = max_tokens or config.LMSTUDIO_MAX_TOKENS
         else:  # ollama
@@ -108,7 +112,30 @@ class LLMService:
             True if model loaded successfully, False otherwise
         """
         try:
-            if self.llm_backend == "ollama":
+            if self.llm_backend == "llamacpp":
+                from llama_index.llms.openai import OpenAI
+                
+                logger.info(f"Loading Llama.cpp LLM: {self.model_name}")
+                logger.info(f"  Llama.cpp URL: {config.LLAMACPP_CHAT_URL}")
+                
+                # Build kwargs for Llama.cpp (OpenAI-compatible)
+                # Use a valid OpenAI model name to bypass validation, but the actual model
+                # used will be whatever is loaded in llama.cpp server
+                kwargs = {
+                    "model": "gpt-3.5-turbo",  # Dummy model name to bypass validation
+                    "api_base": config.LLAMACPP_CHAT_URL,
+                    "api_key": "llama-cpp",  # Dummy key for OpenAI-compatible API
+                    "temperature": self.temperature,
+                    "timeout": config.LLAMACPP_REQUEST_TIMEOUT,
+                    "is_chat_model": True,  # Tell LlamaIndex this is a chat model
+                }
+                
+                self.llm = OpenAI(**kwargs)
+                logger.info("✓ Llama.cpp LLM loaded successfully")
+                logger.info(f"  Note: Using llama.cpp model '{self.model_name}' via OpenAI-compatible API")
+                return True
+            
+            elif self.llm_backend == "ollama":
                 from llama_index.llms.ollama import Ollama
                 
                 logger.info(f"Loading Ollama LLM: {self.model_name}")
@@ -151,14 +178,18 @@ class LLMService:
             
         except ImportError as e:
             logger.error(f"Required package not installed: {str(e)}")
-            if self.llm_backend == "ollama":
+            if self.llm_backend == "llamacpp":
+                logger.error("  Install with: pip install llama-index-llms-openai")
+            elif self.llm_backend == "ollama":
                 logger.error("  Install with: pip install llama-index-llms-ollama")
             else:
                 logger.error("  Install with: pip install llama-index-llms-lmstudio")
             return False
         except Exception as e:
             logger.error(f"Failed to load LLM: {str(e)}")
-            if self.llm_backend == "ollama":
+            if self.llm_backend == "llamacpp":
+                logger.error(f"  Make sure llama.cpp server is running at {config.LLAMACPP_CHAT_URL}")
+            elif self.llm_backend == "ollama":
                 logger.error(f"  Make sure Ollama is running at {config.OLLAMA_URL}")
             else:
                 logger.error(f"  Make sure LM Studio is running at {config.LMSTUDIO_URL}")

@@ -16,6 +16,7 @@ torch>=2.0.0                               # Required for HuggingFace embeddings
 # LLM Backends
 llama-index-llms-ollama>=0.3.0            # Ollama
 llama-index-llms-lmstudio>=0.2.0          # LM Studio
+llama-index-llms-openai>=0.2.0           # Llama.cpp (OpenAI-compatible)
 
 # LangGraph and LangChain (Stage 5+)
 langgraph>=0.2.0

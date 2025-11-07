@@ -12,15 +12,20 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
     restart: unless-stopped
 
-  # Local LLM Server
-  ollama:
-    image: ollama/ollama:latest
+  # Llama.cpp Servers (using OpenAI-compatible API)
+  # Embedding Model Server
+  llamacpp-embeddings:
+    image: ghcr.io/ggml-org/llama.cpp:server
     ports:
-      - "11434:11434"
+      - "8001:8001"
     volumes:
-      - ollama_storage:/root/.ollama
-    environment:
-      - OLLAMA_MODELS=/root/.ollama/models
+      - ./models:/models
+    command: >
+      -m /models/embeddinggemma-300m-qat-Q4_K_M.gguf
+      --port 8001
+      --host 0.0.0.0
+      -n 512
+      --embedding
     restart: unless-stopped
     # Uncomment deploy section below if GPU is available for better performance
     # deploy:
@@ -30,9 +35,45 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+  
+  # Chat LLM Server
+  llamacpp-chat:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./models:/models
+    command: >
+      -m /models/Qwen3-8B-Q4_K_M.gguf
+      --port 8002
+      --host 0.0.0.0
+      -n 2048
+      -c 4096
+    restart: unless-stopped
+    # Uncomment deploy section below if GPU is available for better performance
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+  
+  # Reranker Model Server
+  llamacpp-reranker:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./models:/models
+    command: >
+      -m /models/Qwen3-Reranker-0.6B-Q4_K_M.gguf
+      --port 8003
+      --host 0.0.0.0
+      -n 512
+    restart: unless-stopped
     
 volumes:
   qdrant_storage:
-  ollama_storage:
   postgres_data:
   redis_data: 

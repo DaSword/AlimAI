@@ -26,7 +26,8 @@ class RerankerService:
     Service class for reranking retrieved documents using LlamaIndex's LLMRerank.
     
     Supports multiple backends:
-    - Ollama (default)
+    - Llama.cpp (default, OpenAI-compatible)
+    - Ollama
     - LM Studio (local server)
     
     The LLM evaluates query-document relevance to reorder results.
@@ -43,7 +44,7 @@ class RerankerService:
         Initialize RerankerService.
         
         Args:
-            llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
+            llm_backend: LLM backend ('llamacpp', 'ollama' or 'lmstudio', defaults to config)
             llm_model: LLM model name for reranking (defaults to config based on backend)
             top_n: Number of top results to return after reranking
             choice_batch_size: Batch size for reranking choices
@@ -51,7 +52,9 @@ class RerankerService:
         self.llm_backend = llm_backend or config.LLM_BACKEND
         
         # Set model name based on backend
-        if self.llm_backend == "lmstudio":
+        if self.llm_backend == "llamacpp":
+            self.llm_model = llm_model or config.LLAMACPP_RERANKER_MODEL
+        elif self.llm_backend == "lmstudio":
             self.llm_model = llm_model or config.LMSTUDIO_RERANKER_MODEL
         else:  # ollama
             self.llm_model = llm_model or config.OLLAMA_RERANKER_MODEL
@@ -77,7 +80,15 @@ class RerankerService:
             logger.info(f"Creating LLMRerank with {self.llm_model} ({self.llm_backend})")
             
             # Create LLM instance based on backend
-            if self.llm_backend == "ollama":
+            if self.llm_backend == "llamacpp":
+                from llama_index.llms.openai import OpenAI
+                llm = OpenAI(
+                    model=self.llm_model,
+                    api_base=config.LLAMACPP_RERANKER_URL,
+                    api_key="llama-cpp",
+                    timeout=config.LLAMACPP_REQUEST_TIMEOUT,
+                )
+            elif self.llm_backend == "ollama":
                 from llama_index.llms.ollama import Ollama
                 llm = Ollama(
                     model=self.llm_model,
