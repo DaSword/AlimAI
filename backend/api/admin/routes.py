@@ -67,7 +67,9 @@ async def list_models() -> List[Dict[str, Any]]:
     result = await list_ollama_models()
     
     if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch models"))
+        # If Ollama is not available, return empty list instead of error
+        # This allows the frontend to gracefully handle when Ollama is not running
+        return []
     
     # Transform to match frontend expectations
     models = result.get("models", [])

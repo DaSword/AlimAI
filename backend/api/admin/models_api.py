@@ -120,7 +120,7 @@ async def get_health_status() -> Dict[str, Any]:
     if config.EMBEDDING_BACKEND == "lmstudio" or config.LLM_BACKEND == "lmstudio":
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(f"{config.LMSTUDIO_URL}/v1/models", timeout=5.0)
+                response = await client.get(f"{config.LMSTUDIO_URL}/models", timeout=5.0)
                 health["services"]["lmstudio"] = {
                     "status": "healthy" if response.status_code == 200 else "unhealthy",
                     "url": config.LMSTUDIO_URL,

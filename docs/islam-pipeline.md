@@ -258,6 +258,21 @@ payload = {
         'related_verses': ['2:183', '2:184'],      # Quranic references
         'related_hadiths': ['bukhari:8', 'muslim:16'],  # Hadith references
         'related_topics': ['fasting', 'ramadan'],
+    },
+    
+    # ===== KNOWLEDGE GRAPH RELATIONSHIPS (Stage 10) =====
+    'graph': {
+        # Outgoing edges (forward relationships)
+        'has_tafsir': ['tafsir_2:183_ibn_kathir', 'tafsir_2:183_tabari'],
+        'related_to': ['2:182', '2:184'],
+        'mentions_concept': ['concept_fasting', 'concept_ramadan'],
+        'part_of_surah': ['surah_2'],
+        'narrated_by': ['narrator_abu_huraira'],  # for hadith
+        'supports_ruling': ['fiqh_hanafi_fasting_001'],  # for hadith
+        'commentary_on': ['verse_2:183'],  # for tafsir (backward link)
+        'authored_by': ['scholar_ibn_kathir'],  # for tafsir/fiqh
+        'student_of': ['scholar_malik'],  # for scholars
+        'cites_hadith': ['bukhari:1891'],  # for fiqh
     }
 }
 ```
@@ -299,6 +314,161 @@ pipeline = IngestionPipeline(
 
 documents = load_hadith_json()  # Returns List[Document]
 pipeline.run(documents=documents)
+```
+
+### 3.5 Knowledge Graph Integration (Stage 10)
+
+**Goal:** Enhance vector RAG with explicit relationship tracking for connected knowledge traversal.
+
+#### Graph Schema Design
+
+**Relationship Types:**
+
+```python
+# Quran relationships
+verse → has_tafsir → tafsir
+verse → related_to → verse (sequential, thematic)
+verse → mentions_concept → concept
+verse → part_of_surah → surah
+verse → revealed_after → verse (chronological)
+
+# Hadith relationships  
+hadith → narrated_by → narrator
+hadith → supports_ruling → fiqh_ruling
+hadith → references_verse → verse
+hadith → chain_includes → narrator (isnad chain)
+hadith → from_collection → collection
+
+# Tafsir relationships
+tafsir → commentary_on → verse (backward link)
+tafsir → authored_by → scholar
+tafsir → cites_hadith → hadith
+tafsir → interprets_concept → concept
+
+# Fiqh relationships
+fiqh_ruling → based_on_verse → verse
+fiqh_ruling → based_on_hadith → hadith
+fiqh_ruling → madhab_view → madhab
+fiqh_ruling → authored_by → scholar
+fiqh_ruling → related_ruling → fiqh_ruling (within/across madhahib)
+
+# Scholar relationships
+scholar → student_of → scholar
+scholar → teacher_of → scholar
+scholar → belongs_to_madhab → madhab
+scholar → authored → text (tafsir/fiqh/book)
+scholar → contemporary_of → scholar
+
+# Concept relationships
+concept → subconcept_of → concept (hierarchy)
+concept → related_concept → concept
+concept → mentioned_in_verse → verse
+concept → discussed_in_hadith → hadith
+```
+
+#### Storage in Qdrant Payload
+
+Relationships stored as arrays of node IDs in the `graph` field:
+
+```python
+# Example: Verse 2:255 (Ayat al-Kursi)
+{
+    "id": "verse_2:255",
+    "vector": [...],
+    "payload": {
+        "text_content": "Allah! There is no deity except Him...",
+        "source_type": "quran",
+        "graph": {
+            "has_tafsir": ["tafsir_2:255_ibn_kathir", "tafsir_2:255_tabari"],
+            "related_to": ["2:254", "2:256"],
+            "mentions_concept": ["concept_tawhid", "concept_divine_names"],
+            "part_of_surah": ["surah_2"]
+        }
+    }
+}
+
+# Example: Tafsir by Ibn Kathir
+{
+    "id": "tafsir_2:255_ibn_kathir",
+    "vector": [...],
+    "payload": {
+        "text_content": "This is the greatest verse in the Quran...",
+        "source_type": "tafsir",
+        "graph": {
+            "commentary_on": ["verse_2:255"],  # backward link
+            "authored_by": ["scholar_ibn_kathir"],
+            "cites_hadith": ["bukhari:7376"]
+        }
+    }
+}
+```
+
+#### Graph Manager (`backend/vectordb/graph_manager.py`)
+
+Lightweight graph operations on top of Qdrant:
+
+```python
+class QdrantGraphManager:
+    """Graph traversal and relationship management using Qdrant."""
+    
+    def get_neighbors(node_id: str, edge_type: str) -> List[Point]
+    def get_all_tafsir_for_verse(verse_key: str) -> List[Point]
+    def get_verse_for_tafsir(tafsir_id: str) -> Point
+    def get_narrator_chain(hadith_id: str) -> List[Point]
+    def get_madhab_rulings(topic: str) -> Dict[str, List[Point]]
+    def find_path(start_id: str, end_id: str, max_depth: int) -> List[str]
+    def get_scholar_lineage(scholar_id: str) -> List[Point]
+```
+
+#### Ingestion Modifications
+
+Parsers extract relationships during chunking:
+
+```python
+class QuranNodeParser(NodeParser):
+    def _chunk_verse(self, doc, verse_data):
+        # Create verse node
+        verse_node = TextNode(...)
+        
+        # Extract relationships
+        relationships = {
+            "has_tafsir": extract_tafsir_refs(verse_data),
+            "related_to": get_sequential_verses(verse_data),
+            "mentions_concept": extract_concepts(verse_data),
+            "part_of_surah": [f"surah_{verse_data['surah_number']}"]
+        }
+        
+        # Add to metadata
+        verse_node.metadata["graph"] = relationships
+        
+        return verse_node
+```
+
+#### Enhanced Retrieval with Graph Traversal
+
+Hybrid vector + graph search:
+
+```python
+def retrieve_with_graph_expansion(query: str, depth: int = 1):
+    # 1. Vector search
+    similar_nodes = vector_search(query, limit=5)
+    
+    # 2. Graph expansion
+    expanded_nodes = []
+    for node in similar_nodes:
+        # Get all connected tafsir
+        tafsir = graph.get_neighbors(node.id, "has_tafsir")
+        expanded_nodes.extend(tafsir)
+        
+        # Get related verses
+        related = graph.get_neighbors(node.id, "related_to")
+        expanded_nodes.extend(related)
+    
+    # 3. Return enriched context
+    return {
+        "primary_results": similar_nodes,
+        "graph_expansion": expanded_nodes
+    }
 ```
 
 ## Phase 4: Multi-Backend Model Integration (LlamaIndex) ✅ COMPLETED
@@ -829,6 +999,11 @@ Via admin UI:
 18. **LangGraph Studio:** Visual debugging and workflow inspection out of the box
 19. **Proper timeout handling:** Backend-specific timeout configuration prevents premature failures
 20. **Auto-dimension detection:** Embedding dimensions automatically detected for any model
+21. **Hybrid vector + graph:** Combines semantic search with explicit relationship traversal (Stage 10)
+22. **Graph-lite approach:** Store relationships in Qdrant payload, no separate graph database needed
+23. **Bidirectional linking:** Maintain forward and backward relationships (verse ↔ tafsir, hadith ↔ fiqh)
+24. **Relationship extraction:** Parsers automatically extract graph edges during ingestion
+25. **Flexible graph traversal:** Support 1-hop, 2-hop, and path-finding for connected knowledge
 
 ## Backend Restructuring (Completed)
 
@@ -912,3 +1087,15 @@ python -m backend.tests.test_imports
 - **Self-hosted:** All models run locally through Ollama - no external API dependencies
 - **Debuggable workflows:** LangGraph Studio visualization and state inspection for troubleshooting
 - **Type-safe state management:** Pydantic schemas for all state transitions
+
+### With Stage 10 (Knowledge Graph Enhancement):
+
+- **Hybrid retrieval:** Combines semantic vector search with explicit relationship traversal
+- **Complete context:** Get ALL related content (e.g., all tafsir for a verse), not just top-k similar
+- **Evidence chains:** Trace provenance from verse → hadith → fiqh ruling
+- **Scholar networks:** Navigate teacher-student chains and scholarly lineages
+- **Narrator verification:** Complete isnad chains for hadith authenticity
+- **Concept exploration:** Discover thematic connections across texts
+- **Madhab comparison:** Cross-reference rulings with their evidence across schools
+- **Interactive navigation:** Browse knowledge graph via admin UI
+- **Richer answers:** Relationship-aware responses with deeper context

@@ -551,6 +551,201 @@ None - this is the foundation for all other stages. -->
 
 ---
 
+## Stage 10: Knowledge Graph Enhancement
+
+**Goal:** Enhance the RAG system with explicit relationship tracking for richer context retrieval using Qdrant's payload storage.
+
+### Tasks
+
+#### Technical - Graph Schema Design
+
+- [ ] **Extend Qdrant Schema** (`backend/vectordb/qdrant_manager.py`)
+  - Add `graph` field to payload structure
+  - Define relationship types (has_tafsir, narrated_by, supports_ruling, etc.)
+  - Implement bidirectional linking (forward + backward edges)
+  - Add edge metadata support (weights, confidence scores)
+
+- [ ] **Create Graph Manager** (`backend/vectordb/graph_manager.py`)
+  - `QdrantGraphManager` class for graph operations
+  - `get_neighbors(node_id, edge_type)` - Get connected nodes
+  - `get_all_tafsir_for_verse(verse_key)` - All commentary on a verse
+  - `get_narrator_chain(hadith_id)` - Complete isnad chain
+  - `get_madhab_rulings(topic)` - Rulings from all madhahib
+  - `find_path(start_id, end_id, max_depth)` - Path finding between nodes
+  - `get_scholar_lineage(scholar_id)` - Teacher-student chains
+  - `traverse_depth_n(node_id, edge_types, depth)` - N-hop traversal
+
+#### Technical - Ingestion Updates
+
+- [ ] **Update NodeParsers** (`backend/ingestion/parsers.py`)
+  - `QuranNodeParser`: Extract has_tafsir, related_to, mentions_concept relationships
+  - `HadithNodeParser`: Extract narrated_by, supports_ruling, references_verse chains
+  - `TafsirNodeParser`: Extract commentary_on, authored_by, cites_hadith links
+  - `FiqhNodeParser`: Extract based_on_verse, based_on_hadith, madhab_view connections
+  - Add relationship extraction methods to each parser
+  - Support automatic bidirectional link creation
+
+- [ ] **Create Relationship Extractors** (`backend/ingestion/relationship_extractors.py`)
+  - `extract_verse_references(text)` - Find Quran citations in text
+  - `extract_hadith_references(text)` - Find hadith citations
+  - `extract_narrator_chain(hadith_data)` - Parse isnad into nodes
+  - `extract_concepts(text)` - Identify Islamic concepts mentioned
+  - `extract_scholar_references(metadata)` - Identify scholars
+  - Use regex, NLP, and LLM-based extraction
+
+- [ ] **Update Ingestion Pipeline** (`backend/ingestion/ingestion.py`)
+  - Add relationship extraction phase after chunking
+  - Build relationship index during ingestion
+  - Validate bidirectional links (ensure backward edges exist)
+  - Store graph metadata in Qdrant payload
+
+#### Technical - Enhanced Retrieval
+
+- [ ] **Create Graph-Enhanced Retriever** (`backend/rag/graph_retrieval.py`)
+  - `retrieve_with_graph_expansion(query, depth)` - Vector search + graph traversal
+  - `get_verse_with_tafsir(query)` - Verse + all commentary
+  - `get_hadith_with_context(query)` - Hadith + supporting fiqh rulings
+  - `get_ruling_with_evidence(query)` - Fiqh ruling + Quran/hadith sources
+  - `traverse_scholar_network(scholar_name)` - Scholar and their works
+  - Hybrid scoring: combine vector similarity + graph distance
+
+- [ ] **Update RAG Nodes** (`backend/rag/rag_nodes.py`)
+  - Modify `retrieve_node` to use graph expansion
+  - Add `graph_expansion_node` for controlled traversal
+  - Update context formatter to display graph relationships
+  - Add relationship metadata to citations
+
+- [ ] **Update RAG Graph** (`backend/rag/rag_graph.py`)
+  - Add conditional edge for graph expansion
+  - Route based on query type (enable graph for tafsir/fiqh, optional for others)
+  - Add depth control based on query complexity
+
+#### Technical - Admin UI Integration
+
+- [ ] **Add Graph Visualization Endpoint** (`backend/api/admin/graph_api.py`)
+  - `GET /api/admin/graph/node/{node_id}` - Get node and immediate neighbors
+  - `GET /api/admin/graph/relationships` - Get relationship type counts
+  - `POST /api/admin/graph/path` - Find path between two nodes
+  - `GET /api/admin/graph/stats` - Graph statistics (nodes, edges, density)
+  - Return graph data in format for frontend visualization
+
+- [ ] **Update Frontend Admin Panel** (`frontend/src/components/admin/GraphViewer.tsx`)
+  - Display node details and relationships
+  - Interactive graph visualization (using react-force-graph or similar)
+  - Relationship type filtering
+  - Node search and navigation
+
+#### Non-Technical - Data Enrichment
+
+- [ ] **Enrich Existing Quran Data**
+  - Add tafsir relationships for existing verses
+  - Add sequential verse relationships (2:1 → 2:2)
+  - Add thematic relationships (fasting verses)
+  - Add concept tags
+
+- [ ] **Build Narrator Database**
+  - Extract unique narrators from hadith collections
+  - Build narrator chains (isnad networks)
+  - Add reliability grades if available
+
+- [ ] **Build Scholar Knowledge Base**
+  - Create scholar profiles (birth/death, madhab, teachers, students)
+  - Link scholars to their works (tafsir, fiqh texts)
+  - Build teacher-student chains
+
+- [ ] **Create Concept Taxonomy**
+  - Define Islamic concepts hierarchy (e.g., Tawhid → Divine Names)
+  - Tag texts with concepts
+  - Create concept-to-concept relationships
+
+### Deliverables
+
+- Enhanced Qdrant schema with graph relationships
+- `backend/vectordb/graph_manager.py` - Graph operations (300+ lines)
+- Updated parsers with relationship extraction (150+ lines per parser)
+- `backend/ingestion/relationship_extractors.py` - Extraction utilities (400+ lines)
+- `backend/rag/graph_retrieval.py` - Graph-enhanced retrieval (350+ lines)
+- Updated RAG workflow with graph expansion
+- `backend/api/admin/graph_api.py` - Graph management endpoints (200+ lines)
+- Frontend graph visualization component (250+ lines)
+- Enriched knowledge base with explicit relationships
+
+### Acceptance Criteria
+
+- [ ] Graph schema successfully stores relationships in Qdrant payload
+- [ ] Parsers extract relationships during ingestion automatically
+- [ ] Bidirectional links maintained (verse ↔ tafsir)
+- [ ] Graph traversal operations work correctly (1-hop, 2-hop, path-finding)
+- [ ] Query "What does verse 2:183 mean?" returns verse + all tafsir via graph
+- [ ] Query "Hadith on fasting" returns hadith + related fiqh rulings
+- [ ] Narrator chains correctly extracted and traversable
+- [ ] Graph expansion improves answer quality in testing
+- [ ] Admin UI displays graph relationships and statistics
+- [ ] Graph visualization shows connected knowledge
+- [ ] No performance degradation (graph operations < 100ms)
+- [ ] Memory usage remains reasonable (relationships stored efficiently)
+
+### Implementation Approach
+
+**Phase 1: Schema & Manager (Week 1)**
+1. Extend Qdrant schema with graph field
+2. Implement QdrantGraphManager with basic operations
+3. Test with mock data
+
+**Phase 2: Ingestion (Week 2)**
+1. Update parsers to extract relationships
+2. Create relationship extractors
+3. Test with Quran data (verse-tafsir links)
+
+**Phase 3: Retrieval Enhancement (Week 3)**
+1. Build graph-enhanced retriever
+2. Update RAG workflow nodes
+3. Test hybrid vector + graph retrieval
+
+**Phase 4: Admin & Visualization (Week 4)**
+1. Add graph API endpoints
+2. Build frontend graph viewer
+3. End-to-end testing
+
+**Phase 5: Data Enrichment (Ongoing)**
+1. Enrich existing data with relationships
+2. Build narrator and scholar databases
+3. Create concept taxonomy
+
+### Use Cases Enabled
+
+1. **Deep Tafsir Queries**: "What does verse X mean?" → Verse + all available tafsir
+2. **Evidence-Based Rulings**: "Fiqh ruling on Y" → Ruling + supporting Quran/hadith
+3. **Scholar Research**: "Who was Ibn Kathir?" → Biography + works + students + teachers
+4. **Narrator Verification**: "Who narrated hadith X?" → Complete isnad chain
+5. **Concept Exploration**: "What is Tawhid?" → Definition + verses + hadiths + scholarly works
+6. **Cross-Madhab Comparison**: "Prayer ruling" → All 4 madhab views + their evidence
+7. **Chronological Context**: "What was revealed after verse X?" → Revelation sequence
+8. **Thematic Clustering**: "All verses about fasting" → Connected verse network
+
+### Benefits Over Pure Vector Search
+
+1. **Completeness**: Get ALL tafsir for a verse, not just top-k similar
+2. **Precision**: Direct relationships more accurate than semantic similarity
+3. **Provenance**: Trace chains of evidence (verse → hadith → fiqh ruling)
+4. **Context**: Understand connections between concepts/scholars/texts
+5. **Exploration**: Navigate knowledge graph interactively
+6. **Authenticity**: Follow isnad chains for hadith verification
+
+### Dependencies
+- Stage 5 (RAG system complete)
+- Stage 7 (Data ingested and available)
+
+### Estimated Time
+- Planning & Schema Design: 4-6 hours
+- Implementation: 30-40 hours
+- Data Enrichment: 10-15 hours
+- Testing & Refinement: 8-10 hours
+
+**Total: 50-70 hours**
+
+---
+
 ## Progress Tracking
 
 ### Current Stage
@@ -566,6 +761,7 @@ None - this is the foundation for all other stages. -->
 - [ ] Stage 7: Tier 1 Data Acquisition & Ingestion
 - [ ] Stage 8: Testing & Refinement
 - [ ] Stage 9: Tier 2 & 3 Expansion (Future)
+- [ ] Stage 10: Knowledge Graph Enhancement (Optional, recommended after Stage 8)
 
 ---
 
@@ -579,6 +775,8 @@ None - this is the foundation for all other stages. -->
 - Stage 7 requires Stages 4-6 complete (need working ingestion + admin panel)
 - Stage 8 requires Stage 7 (need data to test)
 - Stage 9 is iterative and can be done incrementally
+- Stage 10 requires Stages 5 & 7 complete (need RAG system + data to enhance)
+- Stage 10 is optional but highly recommended for maximum answer quality
 
 ### Time Estimates (rough)
 - Stage 1: 2-4 hours
@@ -590,8 +788,10 @@ None - this is the foundation for all other stages. -->
 - Stage 7: 4-8 hours (mostly data acquisition time)
 - Stage 8: 6-10 hours
 - Stage 9: Ongoing (2-4 hours per text)
+- Stage 10: 50-70 hours (knowledge graph enhancement)
 
 **Total estimated time for Stages 1-8: 50-75 hours**
+**Total with Stage 10: 100-145 hours**
 
 ### Critical Success Factors
 1. **Data Quality:** Ensure all acquired texts are authentic and properly formatted

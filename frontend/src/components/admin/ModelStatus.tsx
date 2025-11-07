@@ -121,7 +121,7 @@ export default function ModelStatus() {
               <div>
                 <p className="text-sm font-medium">LangGraph</p>
                 <p className="text-xs text-muted-foreground">
-                  {health?.services?.langgraph?.status === "healthy" ? "Running" : "Offline"}
+                  {health?.services?.langgraph?.status === "healthy" ? "Running :8123" : "Offline"}
                 </p>
               </div>
             </div>
