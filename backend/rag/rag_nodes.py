@@ -15,6 +15,7 @@ import json
 import re
 
 from llama_index.core.llms import ChatMessage, MessageRole
+from langgraph.config import get_stream_writer
 
 from backend.core.models import (
     RAGState,
@@ -24,6 +25,9 @@ from backend.core.models import (
 )
 from backend.rag.prompts import (
     QUERY_CLASSIFIER_PROMPT,
+    QUERY_COMPLEXITY_PROMPT,
+    CONVERSATIONAL_RESPONSE_PROMPT,
+    FOLLOW_UP_EXPANSION_PROMPT,
     SYSTEM_IDENTITY,
     get_expansion_prompt,
     get_generation_prompt,
@@ -42,6 +46,145 @@ from backend.core.config import Config
 
 # Initialize config
 config = Config()
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def format_conversation_history(messages: List[Dict[str, Any]], max_turns: int = 10) -> str:
+    """
+    Format conversation history for inclusion in prompts.
+    Excludes the last user message (current query being processed).
+    
+    Args:
+        messages: List of message dicts with role and content
+        max_turns: Maximum number of message pairs to include
+        
+    Returns:
+        Formatted conversation history string
+    """
+    if not messages:
+        return "No previous conversation."
+    
+    # Exclude the last user message (the current query)
+    msgs_to_format = messages[:]
+    for i in range(len(msgs_to_format) - 1, -1, -1):
+        if msgs_to_format[i].get("role") == "user":
+            msgs_to_format = msgs_to_format[:i]
+            break
+    
+    if not msgs_to_format:
+        return "No previous conversation."
+    
+    # Take last N messages (max_turns * 2 for user/assistant pairs)
+    recent_messages = msgs_to_format[-(max_turns * 2):]
+    
+    formatted = []
+    for msg in recent_messages:
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        
+        if role == "user":
+            formatted.append(f"User: {content}")
+        elif role == "assistant":
+            # Truncate long responses for context
+            if len(content) > 500:
+                content = content[:500] + "..."
+            formatted.append(f"Assistant: {content}")
+    
+    return "\n\n".join(formatted) if formatted else "No previous conversation."
+
+
+# ============================================================================
+# Node 0: Query Complexity Analysis
+# ============================================================================
+
+def analyze_query_complexity_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Analyze query complexity and determine routing strategy.
+    
+    Classifies queries as:
+    - simple_conversational: Greetings, thanks, acknowledgments
+    - follow_up: References previous conversation (vague/contextual queries)
+    - simple_factual: Basic factual questions
+    - complex: Requires comprehensive retrieval
+    
+    Args:
+        state: Current RAG state
+        
+    Returns:
+        Updated state with query_complexity and needs_new_retrieval
+    """
+    messages = state.get("messages", [])
+    
+    # Extract the last user message from the conversation
+    user_query = ""
+    if messages:
+        for msg in reversed(messages):
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                user_query = msg.get("content", "")
+                break
+    
+    if not user_query:
+        user_query = state.get("user_query", "")  # Fallback to direct input
+    
+    print(f"🔍 Analyzing query complexity: {user_query}")
+    
+    # Format conversation history
+    conversation_history = format_conversation_history(messages, max_turns=3)
+    
+    # Format complexity analysis prompt
+    complexity_prompt = format_prompt(
+        QUERY_COMPLEXITY_PROMPT,
+        user_query=user_query,
+        conversation_history=conversation_history,
+    )
+    
+    # Get LLM
+    llm = get_llm(backend=config.LLM_BACKEND)
+    
+    try:
+        # Analyze complexity
+        response = llm.complete(complexity_prompt)
+        response_text = str(response).strip().lower()
+        
+        # Parse response
+        query_complexity = "complex"  # Default
+        needs_new_retrieval = True  # Default
+        
+        # Extract complexity
+        if "simple_conversational" in response_text:
+            query_complexity = "simple_conversational"
+            needs_new_retrieval = False
+        elif "follow_up" in response_text:
+            query_complexity = "follow_up"
+            # Check if new retrieval is needed
+            if "needs_new_retrieval: no" in response_text or "use_existing" in response_text:
+                needs_new_retrieval = False
+        elif "simple_factual" in response_text:
+            query_complexity = "simple_factual"
+            needs_new_retrieval = True  # But will use light retrieval
+        else:
+            query_complexity = "complex"
+            needs_new_retrieval = True
+        
+        print(f"✅ Complexity: {query_complexity}, New retrieval: {needs_new_retrieval}")
+        
+        return {
+            "user_query": user_query,  # Pass along for subsequent nodes
+            "query_complexity": query_complexity,
+            "needs_new_retrieval": needs_new_retrieval,
+        }
+    
+    except Exception as e:
+        print(f"❌ Complexity analysis error: {e}")
+        # Default to complex query with retrieval
+        return {
+            "user_query": user_query,  # Pass along even on error
+            "query_complexity": "complex",
+            "needs_new_retrieval": True,
+        }
 
 
 # ============================================================================
@@ -325,10 +468,15 @@ def generate_response_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate a response using the LLM and ranked context.
     
+    Supports both streaming and non-streaming modes based on configuration.
+    When streaming is enabled, uses get_stream_writer() to emit tokens in real-time.
+    
     Synthesizes information from sources with proper citations.
+    Includes conversation history for context-aware responses.
     
     Args:
         state: Current RAG state
+        config: Optional LangGraph configuration dict
         
     Returns:
         Updated state with response
@@ -336,10 +484,25 @@ def generate_response_node(state: Dict[str, Any]) -> Dict[str, Any]:
     user_query = state.get("user_query", "")
     question_type = QuestionType(state.get("question_type", "general"))
     ranked_docs_dict = state.get("ranked_docs", [])
+    messages_history = state.get("messages", [])
     
-    print(f"🤖 Generating response...")
+    # Check if streaming is enabled (defaults to True for streaming)
+    # Can be overridden by setting "enable_streaming" in state
+    enable_streaming = state.get("enable_streaming", True)
+    
+    mode_str = "STREAMING" if enable_streaming else "NON-STREAMING"
+    print(f"🤖 Generating response ({mode_str})...")
     
     try:
+        # Get stream writer if streaming is enabled
+        writer = None
+        if enable_streaming:
+            try:
+                writer = get_stream_writer()
+            except Exception:
+                # Stream writer not available (e.g., not called with stream mode)
+                writer = None
+        
         # Convert dicts back to DocumentChunk objects
         from backend.core.models import QdrantPayload
         
@@ -353,16 +516,22 @@ def generate_response_node(state: Dict[str, Any]) -> Dict[str, Any]:
             )
             ranked_docs.append(doc)
         
+        # Format conversation history
+        conversation_history = format_conversation_history(messages_history, max_turns=10)
+        
         # Check if we have ranked docs to use as context
         if not ranked_docs:
             print(f"⚠️ No ranked docs available, generating without specific sources")
             # Generate without context, with a disclaimer
             no_context_prompt = f"""The user asked: "{user_query}"
 
-I couldn't find specific sources in my Islamic knowledge base for this query. 
-However, I will provide a general Islamic perspective based on well-known Islamic principles.
+**Conversation History:**
+{conversation_history}
 
-Please provide a helpful response based on general Islamic knowledge, but include a disclaimer that specific sources couldn't be retrieved and the user should verify this information with scholars or authentic Islamic sources."""
+We couldn't find specific sources in our Islamic knowledge base for this query. 
+However, you should provide a general Islamic perspective based on well-known Islamic principles.
+
+Please provide a helpful response based on general Islamic knowledge, but include a disclaimer that specific sources couldn't be retrieved."""
             
             generation_prompt = no_context_prompt
         else:
@@ -376,26 +545,43 @@ Please provide a helpful response based on general Islamic knowledge, but includ
             # Get appropriate generation prompt
             generation_prompt_template = get_generation_prompt(question_type)
             
-            # Format generation prompt
+            # Format generation prompt with conversation history
             generation_prompt = format_prompt(
                 generation_prompt_template,
                 user_query=user_query,
                 context=context,
+                conversation_history=conversation_history,
             )
         
-        # Get LLM
-        llm = get_llm(backend=config.LLM_BACKEND)
+        # Get LLM (use module-level config, not function parameter)
+        from backend.core.config import Config
+        app_config = Config()
+        llm = get_llm(backend=app_config.LLM_BACKEND)
         
         # Create messages using ChatMessage objects
         system_msg_dict = create_system_message(include_identity=True)
-        messages = [
+        chat_messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=system_msg_dict["content"]),
             ChatMessage(role=MessageRole.USER, content=generation_prompt),
         ]
         
-        # Generate response
-        response = llm.chat(messages)
-        response_text = str(response.message.content)
+        # Generate response (streaming or non-streaming)
+        if enable_streaming and writer:
+            # Streaming mode: emit tokens as they're generated
+            accumulated_response = ""
+            response_stream = llm.stream_chat(chat_messages)
+            
+            for chunk in response_stream:
+                if chunk.delta:
+                    accumulated_response += chunk.delta
+                    # Stream token via writer
+                    writer({"token": chunk.delta, "response": accumulated_response})
+            
+            response_text = accumulated_response
+        else:
+            # Non-streaming mode: wait for complete response
+            response = llm.chat(chat_messages)
+            response_text = str(response.message.content)
         
         print(f"✅ Generated response ({len(response_text)} chars)")
         
@@ -407,6 +593,99 @@ Please provide a helpful response based on general Islamic knowledge, but includ
         print(f"❌ Generation error: {e}")
         return {
             "response": f"I encountered an error generating the response: {str(e)}",
+        }
+
+
+# ============================================================================
+# Node 7: Generate Conversational Response (Unified - Streaming & Non-Streaming)
+# ============================================================================
+
+def generate_conversational_response_node(state: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Generate a simple conversational response without retrieval.
+    
+    Supports both streaming and non-streaming modes based on configuration.
+    When streaming is enabled, uses get_stream_writer() to emit tokens in real-time.
+    
+    For greetings, acknowledgments, and simple conversational queries.
+    
+    Args:
+        state: Current RAG state
+        config: Optional LangGraph configuration dict
+        
+    Returns:
+        Updated state with response
+    """
+    user_query = state.get("user_query", "")
+    messages = state.get("messages", [])
+    
+    # Check if streaming is enabled (defaults to True for streaming)
+    # Can be overridden by setting "enable_streaming" in state
+    enable_streaming = state.get("enable_streaming", True)
+    
+    mode_str = "STREAMING" if enable_streaming else "NON-STREAMING"
+    print(f"💬 Generating conversational response ({mode_str})...")
+    
+    try:
+        # Get stream writer if streaming is enabled
+        writer = None
+        if enable_streaming:
+            try:
+                writer = get_stream_writer()
+            except Exception:
+                # Stream writer not available
+                writer = None
+        
+        # Format conversation history
+        conversation_history = format_conversation_history(messages, max_turns=5)
+        
+        # Format conversational prompt
+        conversational_prompt = format_prompt(
+            CONVERSATIONAL_RESPONSE_PROMPT,
+            user_query=user_query,
+            conversation_history=conversation_history,
+        )
+        
+        # Get LLM (use module-level config, not function parameter)
+        from backend.core.config import Config
+        app_config = Config()
+        llm = get_llm(backend=app_config.LLM_BACKEND)
+        
+        # Create messages
+        system_msg_dict = create_system_message(include_identity=True)
+        chat_messages = [
+            ChatMessage(role=MessageRole.SYSTEM, content=system_msg_dict["content"]),
+            ChatMessage(role=MessageRole.USER, content=conversational_prompt),
+        ]
+        
+        # Generate response (streaming or non-streaming)
+        if enable_streaming and writer:
+            # Streaming mode: emit tokens as they're generated
+            accumulated_response = ""
+            response_stream = llm.stream_chat(chat_messages)
+            
+            for chunk in response_stream:
+                if chunk.delta:
+                    accumulated_response += chunk.delta
+                    # Stream token via writer
+                    writer({"token": chunk.delta, "response": accumulated_response})
+            
+            response_text = accumulated_response
+        else:
+            # Non-streaming mode: wait for complete response
+            response = llm.chat(chat_messages)
+            response_text = str(response.message.content)
+        
+        print(f"✅ Generated conversational response ({len(response_text)} chars)")
+        
+        return {
+            "response": response_text,
+        }
+    
+    except Exception as e:
+        print(f"❌ Conversational generation error: {e}")
+        return {
+            "response": "I'm here to help with questions about Islam. How can I assist you today?",
         }
 
 
@@ -500,6 +779,71 @@ def update_messages_node(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+
+
+
+# ============================================================================
+# Node 8: Light Retrieval (Simple Factual Queries)
+# ============================================================================
+
+def light_retrieve_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Lightweight retrieval for simple factual queries.
+    
+    Uses fewer sources and skips query expansion for efficiency.
+    
+    Args:
+        state: Current RAG state
+        
+    Returns:
+        Updated state with retrieved_docs
+    """
+    user_query = state.get("user_query", "")
+    question_type = QuestionType(state.get("question_type", "general"))
+    madhab_preference = state.get("madhab_preference")
+    
+    print(f"📚 Light retrieval for simple query...")
+    
+    try:
+        # Initialize retriever
+        retriever = IslamicRetriever(
+            collection_name=config.QDRANT_COLLECTION,
+            embedding_backend=config.EMBEDDING_BACKEND,
+            llm_backend=config.LLM_BACKEND,
+        )
+        
+        # Retrieve with fewer sources (top 3-5)
+        docs = retriever.retrieve_for_question_type(
+            query=user_query,
+            question_type=question_type,
+            top_k=5,  # Fewer sources for simple queries
+            madhab_preference=madhab_preference,
+        )
+        
+        print(f"✅ Retrieved {len(docs)} documents (light retrieval)")
+        
+        # Convert to dict for JSON serialization
+        retrieved_docs_dict = [
+            {
+                "id": doc.id,
+                "text_content": doc.text_content,
+                "metadata": doc.metadata.model_dump(),
+                "score": doc.score,
+            }
+            for doc in docs
+        ]
+        
+        return {
+            "retrieved_docs": retrieved_docs_dict,
+        }
+    
+    except Exception as e:
+        print(f"❌ Light retrieval error: {e}")
+        return {
+            "retrieved_docs": [],
+        }
+
+
 # ============================================================================
 # Conditional Edge Functions
 # ============================================================================
@@ -557,6 +901,49 @@ def has_documents(state: Dict[str, Any]) -> str:
     else:
         # No documents found - generate empty response
         return "generate_response"
+
+
+def route_by_complexity(state: Dict[str, Any]) -> str:
+    """
+    Route workflow based on query complexity.
+    
+    Args:
+        state: Current RAG state
+        
+    Returns:
+        Next node name
+    """
+    query_complexity = state.get("query_complexity", "complex")
+    needs_new_retrieval = state.get("needs_new_retrieval", True)
+    
+    if query_complexity == "simple_conversational":
+        return "generate_conversational"
+    elif query_complexity == "follow_up":
+        if needs_new_retrieval:
+            # Need new sources, go through full pipeline
+            return "classify_query"
+        else:
+            # Can use existing sources, skip to generation
+            return "generate_response"
+    elif query_complexity == "simple_factual":
+        # Use light retrieval
+        return "classify_query_simple"  # Will route to light retrieval
+    else:
+        # Complex query, full pipeline
+        return "classify_query"
+
+
+def route_simple_query(state: Dict[str, Any]) -> str:
+    """
+    Route simple factual queries to light retrieval.
+    
+    Args:
+        state: Current RAG state
+        
+    Returns:
+        Next node name
+    """
+    return "light_retrieve"
 
 
 # ============================================================================

@@ -65,6 +65,9 @@ class Config:
     # Application Settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     
+    # Streaming Configuration
+    ENABLE_STREAMING: bool = os.getenv("ENABLE_STREAMING", "true").lower() in ("true", "1", "yes")
+    
     # Server Configuration (for future LangGraph Server)
     SERVER_HOST: str = os.getenv("SERVER_HOST", "0.0.0.0")
     SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8123"))

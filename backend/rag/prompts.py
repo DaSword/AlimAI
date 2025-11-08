@@ -16,127 +16,120 @@ from backend.core.models import QuestionType
 # Identity & Methodology Prompt
 # ============================================================================
 
-SYSTEM_IDENTITY = """You are an Islamic knowledge assistant grounded in authentic Sunni sources. Your purpose is to provide accurate, source-backed answers to questions about Islam.
+SYSTEM_IDENTITY = """You are an Islamic knowledge assistant grounded in authentic Sunni sources.
 
 **Core Principles:**
-
-1. **Source Priority:**
-   - Always prioritize the Quran as the primary source
-   - Follow with authentic Hadith (Sahih al-Bukhari, Sahih Muslim)
-   - Include scholarly interpretations from recognized authorities
-   - Present balanced views from the four madhahib (schools of jurisprudence) when relevant
-
-2. **Methodology:**
-   - Every claim must be backed by specific sources with citations
-   - Never contradict clear Quranic or authentic Hadith teachings
-   - Acknowledge scholarly differences respectfully
-   - Distinguish between authentic and weak narrations
-   - Avoid sectarian polemics
-
-3. **Response Framework:**
-   - Provide direct, clear answers
-   - Support with Quranic verses and authentic Hadith
-   - Include relevant scholarly interpretations
-   - Offer practical guidance when applicable
-
-4. **Islamic Perspective:**
-   - Frame general questions within an Islamic context when appropriate
-   - Connect universal concepts to Islamic teachings
-   - Maintain respect for Islamic tradition and scholarship
+- Prioritize Quran, then Sahih Hadith, then scholarly consensus
+- Every claim must cite specific sources
+- Acknowledge scholarly differences respectfully
+- Distinguish authentic from weak narrations
+- Provide direct, clear answers with practical guidance when relevant
 
 **Your responses should be:**
 - Accurate and source-grounded
 - Clear and accessible
-- Balanced and respectful
-- Properly cited with specific references
+- Properly cited with specific references (Surah:Verse, Hadith collection:number)
 """
+
+# ============================================================================
+# Query Complexity Analysis Prompt
+# ============================================================================
+
+QUERY_COMPLEXITY_PROMPT = """Analyze this query in the conversation context.
+
+**Conversation History:**
+{conversation_history}
+
+**Current Query:** {user_query}
+
+Classify as ONE of:
+- simple_conversational: Greeting, thanks, acknowledgment (hi, hello, thank you, ok, got it)
+- follow_up: References previous response (tell me more, what about X, can you clarify, elaborate on that)
+- simple_factual: Basic factual question (when was prophet born, what is islam, who was Abu Bakr)
+- complex: Requires deep source analysis (jurisprudence questions, theological discussions, detailed tafsir)
+
+For follow_up queries, also determine:
+- needs_new_retrieval: yes (if asking about new topic) or no (if expanding on current topic)
+
+Return format:
+complexity: [category]
+needs_new_retrieval: [yes/no] (only if follow_up)"""
 
 # ============================================================================
 # Query Classification Prompt
 # ============================================================================
 
-QUERY_CLASSIFIER_PROMPT = """Classify the following user question into one of these categories:
+QUERY_CLASSIFIER_PROMPT = """Classify the user question into one category:
 
 **Categories:**
-- **general**: General questions about Islam, Islamic history, ethics, or broad topics (If unsure, classify as general)
-- **fiqh**: Questions about Islamic jurisprudence, rulings, halal/haram, how to perform acts of worship
-- **aqidah**: Questions about Islamic theology, beliefs, pillars of faith, God's attributes
-- **tafsir**: Questions about Quranic verses, their meanings, or interpretations
-- **hadith**: Questions asking about specific prophetic sayings or traditions
-
-**Examples:**
-- "How do I pray Witr?" → fiqh
-- "What are the attributes of Allah?" → aqidah
-- "What does Ayat al-Kursi mean?" → tafsir
-- "What did the Prophet say about intentions?" → hadith
-- "What is the purpose of life in Islam?" → general
+- general: General questions (default if unsure)
+- fiqh: Jurisprudence, rulings, halal/haram, worship practices
+- aqidah: Theology, beliefs, faith pillars
+- tafsir: Quranic verse meanings and interpretations
+- hadith: Prophetic sayings and traditions
 
 **User Question:** {user_query}
 
-**Instructions:**
-- If unsure, classify as general
-- If the question is about a specific topic, classify it into the most appropriate category
-- Be VERY CONCISE, only return one word from the categories above.
-
-**Classification:** Return ONLY one word from: fiqh, aqidah, tafsir, hadith, general. If unsure, classify as general."""
+Return ONLY one word: fiqh, aqidah, tafsir, hadith, or general"""
 
 # ============================================================================
 # Query Expansion Prompts
 # ============================================================================
 
-QUERY_EXPANSION_PROMPT = """Reformulate the following question to make it more specific and Islam-centric. Generate 2-3 alternative phrasings that would help retrieve relevant Islamic sources.
+QUERY_EXPANSION_PROMPT = """Reformulate this question to improve retrieval from Islamic sources. Generate 2-3 alternative phrasings.
 
 **Original Question:** {user_query}
 
 **Question Type:** {question_type}
 
-**Instructions:**
-- Make implicit Islamic concepts explicit
-- Add relevant Arabic terminology
-- Include alternative phrasings that scholars might use
-- Keep questions focused and specific
+Make implicit Islamic concepts explicit, add relevant Arabic terminology, and use scholarly phrasing.
 
-**Example:**
-Original: "What is charity?"
-Reformulated:
-1. "What is charity (Sadaqah and Zakat) in Islam?"
-2. "What are the Islamic teachings on charitable giving?"
-3. "What do the Quran and Hadith say about charity and helping the poor?"
+Example:
+"What is charity?" →
+1. What is charity (Sadaqah and Zakat) in Islam?
+2. What do the Quran and Hadith say about charitable giving?
 
-Generate 2-3 reformulated questions as a list (one question per line):"""
+Generate 2-3 reformulated questions (one per line):"""
 
-FIQH_QUERY_EXPANSION = """Reformulate this fiqh question to retrieve rulings from multiple madhahib (schools of jurisprudence).
+FIQH_QUERY_EXPANSION = """Reformulate this fiqh question to retrieve madhahib perspectives.
 
 **Original Question:** {user_query}
 
-**Instructions:**
-- Include terms like "ruling", "madhab", "jurisprudence"
-- Consider different schools: Hanafi, Maliki, Shafi'i, Hanbali
-- Focus on practical application
+Include terms like "ruling", "madhab", "Hanafi/Maliki/Shafi'i/Hanbali view", and practical application.
 
-Generate 2-3 reformulated questions as a list:"""
+Generate 2-3 reformulated questions:"""
 
-AQIDAH_QUERY_EXPANSION = """Reformulate this aqidah (theology) question to prioritize Quranic and authentic Hadith sources.
+AQIDAH_QUERY_EXPANSION = """Reformulate this aqidah question for Quran and Hadith retrieval.
 
 **Original Question:** {user_query}
 
-**Instructions:**
-- Include terms like "belief", "faith", "iman"
-- Focus on Quran and Sahih Hadith
-- Consider classical theological terminology
+Include terms like "belief", "faith", "iman", and focus on primary sources.
 
-Generate 2-3 reformulated questions as a list:"""
+Generate 2-3 reformulated questions:"""
 
-TAFSIR_QUERY_EXPANSION = """Reformulate this tafsir question to retrieve verse-specific commentary.
+TAFSIR_QUERY_EXPANSION = """Reformulate this tafsir question for verse commentary retrieval.
 
 **Original Question:** {user_query}
 
-**Instructions:**
-- Include verse references if identifiable
-- Use terms like "tafsir", "interpretation", "meaning"
-- Include scholar names when relevant (Ibn Kathir, Al-Tabari, etc.)
+Include verse references if identifiable, terms like "tafsir", "interpretation", and scholar names (Ibn Kathir, Al-Tabari).
 
-Generate 2-3 reformulated questions as a list:"""
+Generate 2-3 reformulated questions:"""
+
+FOLLOW_UP_EXPANSION_PROMPT = """The user is asking a follow-up question about the previous topic.
+
+**Previous Response:**
+{previous_response}
+
+**Previous Sources Used:**
+{previous_sources}
+
+**Follow-up Query:** {user_query}
+
+Determine if this can be answered using the previous sources or requires new retrieval.
+
+If the question can be answered by elaborating on the previous response, return: "use_existing"
+
+If new retrieval is needed, provide 2-3 reformulated standalone queries (one per line):"""
 
 # ============================================================================
 # Context Ranking Prompt
@@ -162,7 +155,19 @@ Return the sources in ranked order (most relevant and authentic first)."""
 # Response Generation Prompts
 # ============================================================================
 
-RESPONSE_GENERATION_PROMPT = """Based on the authentic Islamic sources provided, generate a comprehensive answer to the user's question.
+CONVERSATIONAL_RESPONSE_PROMPT = """You are an Islamic knowledge assistant.
+
+**Conversation History:**
+{conversation_history}
+
+**User:** {user_query}
+
+Respond naturally and concisely. For topics requiring Islamic sources, politely encourage them to ask a specific question so you can provide proper citations."""
+
+RESPONSE_GENERATION_PROMPT = """Answer this question using the provided Islamic sources.
+
+**Conversation History:**
+{conversation_history}
 
 **User Question:** {user_query}
 
@@ -170,86 +175,19 @@ RESPONSE_GENERATION_PROMPT = """Based on the authentic Islamic sources provided,
 {context}
 
 **Instructions:**
-1. **Answer directly** - Start with a clear, direct answer
-2. **Provide evidence** - Support with Quranic verses and authentic Hadith
-3. **Include scholarship** - Add relevant interpretations from recognized scholars
-4. **Cite specifically** - Reference each source with precise citations (Surah:Verse, Hadith book:number)
-5. **Acknowledge differences** - When applicable, present multiple scholarly views
-6. **Be practical** - Include practical guidance when relevant
+1. Start with a clear, direct answer
+2. Support with Quranic verses and authentic Hadith
+3. Include relevant scholarly interpretations
+4. Cite each source specifically (Surah:Verse, Hadith collection:number)
+5. Acknowledge scholarly differences when present
+6. Add practical guidance if relevant
 
-**Response Format (Use Markdown):**
-- Start with a direct answer in a paragraph
-- Use **bold** for emphasis on key Islamic terms
-- Use proper headings (##, ###) to organize different sections
-- Use bullet points (-) or numbered lists (1., 2., 3.) for multiple points
-- Use > blockquotes for Quranic verses and Hadith quotations
-- Format citations clearly at the end
+Use markdown formatting naturally - headings, bold for key terms, blockquotes for verses/hadith, and bullet points where helpful."""
 
-**Example Structure:**
-## Direct Answer
-[Clear, concise answer]
+FIQH_GENERATION_PROMPT = """Answer this fiqh question using the provided sources, showing madhahib perspectives when available.
 
-## Quranic Guidance
-> "[Quranic verse text]" (Surah Name X:Y)
-
-## Prophetic Guidance
-> [Hadith text] (Sahih Bukhari, Hadith #)
-
-## Scholarly Interpretation
-- Point 1
-- Point 2
-
-## Practical Guidance
-[Practical advice]
-
-Generate your response using proper markdown formatting:"""
-
-FIQH_GENERATION_PROMPT = """Based on the authentic Islamic sources provided, generate a comprehensive fiqh answer showing perspectives from multiple madhahib when applicable.
-
-**User Question:** {user_query}
-
-**Retrieved Sources from Madhahib:**
-{context}
-
-**Instructions:**
-1. **Direct Answer** - Provide the general ruling
-2. **Evidence** - Cite Quran and Hadith supporting the ruling
-3. **Madhab Views** - Present views from different schools:
-   - Hanafi:
-   - Maliki:
-   - Shafi'i:
-   - Hanbali:
-4. **Practical Guidance** - Explain how to apply the ruling
-5. **Citations** - Include specific source references
-
-**Response Format (Use Markdown):**
-- Use **bold** for key Islamic terms and rulings
-- Use ## headings to organize sections
-- Use bullet points or numbered lists for madhab differences
-- Use > blockquotes for Quranic verses and Hadith
-- Format madhab views clearly
-
-**Example Structure:**
-## Ruling Summary
-[Direct answer with ruling]
-
-## Evidence from Primary Sources
-> [Quranic verse or Hadith]
-
-## Views of the Four Madhahib
-- **Hanafi:** [View]
-- **Maliki:** [View]
-- **Shafi'i:** [View]
-- **Hanbali:** [View]
-
-## Practical Application
-[Step-by-step guidance]
-
-**Note:** If madhahib agree, state the consensus. If they differ, explain the differences respectfully.
-
-Generate your response using proper markdown formatting:"""
-
-AQIDAH_GENERATION_PROMPT = """Based on the Quran and authentic Hadith, provide a clear answer about this matter of Islamic belief.
+**Conversation History:**
+{conversation_history}
 
 **User Question:** {user_query}
 
@@ -257,37 +195,34 @@ AQIDAH_GENERATION_PROMPT = """Based on the Quran and authentic Hadith, provide a
 {context}
 
 **Instructions:**
-1. **Core Teaching** - State the Islamic belief clearly
-2. **Quranic Foundation** - Cite relevant verses
-3. **Prophetic Guidance** - Include authentic Hadith
-4. **Scholarly Consensus** - Note consensus among Sunni scholars
-5. **Practical Implications** - Explain how this belief affects practice
+1. State the general ruling clearly
+2. Cite Quran and Hadith evidence
+3. Present madhab views if sources provide them (Hanafi, Maliki, Shafi'i, Hanbali)
+4. If madhahib agree, state consensus; if they differ, explain differences respectfully
+5. Provide practical application guidance
+6. Include specific citations
 
-**Response Format (Use Markdown):**
-- Use **bold** for key theological concepts
-- Use ## headings to organize sections
-- Use > blockquotes for Quranic verses and Hadith
-- Use bullet points or numbered lists for multiple points
-- Clearly separate foundational evidence from practical implications
+Use markdown naturally for organization."""
 
-**Example Structure:**
-## Core Belief
-[Clear statement of the Islamic belief]
+AQIDAH_GENERATION_PROMPT = """Answer this theological question using Quran and authentic Hadith.
 
-## Quranic Foundation
-> "[Quranic verse]" (Surah Name X:Y)
+**Conversation History:**
+{conversation_history}
 
-## Prophetic Guidance
-> [Hadith text] (Collection, Hadith #)
+**User Question:** {user_query}
 
-## Scholarly Consensus
-[Explanation of scholarly agreement]
+**Retrieved Sources:**
+{context}
 
-## Practical Implications
-- How this belief affects daily practice
-- How it shapes a Muslim's worldview
+**Instructions:**
+1. State the Islamic belief clearly
+2. Cite relevant Quranic verses
+3. Include authentic Hadith
+4. Note scholarly consensus among Sunni scholars
+5. Explain practical implications of this belief
+6. Include specific citations
 
-Generate your response using proper markdown formatting:"""
+Use markdown naturally for organization."""
 
 # ============================================================================
 # Citation Formatting
