@@ -96,6 +96,7 @@ export async function* streamChatResponse(
         input: {
           messages: [{ role: "user", content: message }],
         },
+        streamMode: ["values", "custom"], // ✅ Listen to both state updates and custom streaming
       }
     );
 

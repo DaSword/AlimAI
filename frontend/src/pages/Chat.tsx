@@ -135,6 +135,21 @@ export default function ChatPage() {
 
       for await (const event of streamChatResponse(threadId, userMessage.content)) {
         // Handle different event types from LangGraph
+        
+        // Custom streaming events (token-by-token from get_stream_writer)
+        if (event.event === "custom") {
+          if (event.data?.token) {
+            // Append token to accumulated content
+            accumulatedContent += event.data.token;
+            setStreamingMessage(accumulatedContent);
+          } else if (event.data?.response) {
+            // Fallback: use full response if available
+            accumulatedContent = event.data.response;
+            setStreamingMessage(accumulatedContent);
+          }
+        }
+        
+        // State values (complete state after node execution)
         if (event.event === "values") {
           // Extract the assistant's response
           if (event.data?.messages) {
