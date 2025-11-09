@@ -239,7 +239,7 @@ def get_llm(
     llm_backend: Optional[str] = None,
     model: Optional[str] = None,
     base_url: Optional[str] = None,
-    temperature: float = 0.7,
+    temperature: float = 0.6,
     **kwargs
 ):
     """
