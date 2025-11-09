@@ -227,7 +227,6 @@ def invoke_rag_workflow(
         Final state dict with response and citations
     """
     # Create initial state
-    # Note: messages field is managed by LangGraph state persistence, not set here
     initial_state = {
         "user_query": user_query,
         "madhab_preference": madhab_preference,

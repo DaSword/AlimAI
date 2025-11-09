@@ -133,7 +133,14 @@ export default function ChatPage() {
       let accumulatedContent = "";
       let sources: any[] = [];
 
-      for await (const event of streamChatResponse(threadId, userMessage.content)) {
+      // Convert current messages to ChatMessage format for conversation history
+      // Include both user and assistant messages with their original roles
+      const conversationHistory: ChatMessage[] = messages.map(msg => ({
+        role: msg.role, // Preserves "user" or "assistant" 
+        content: msg.content
+      }));
+
+      for await (const event of streamChatResponse(threadId, userMessage.content, conversationHistory)) {
         // Handle different event types from LangGraph
         
         // Custom streaming events (token-by-token from get_stream_writer)

@@ -73,11 +73,11 @@ export async function createThread(): Promise<string> {
 export async function* streamChatResponse(
   threadId: string,
   message: string,
+  conversationHistory: ChatMessage[] = [],
   timeoutMs: number = 180000 // 3 minutes timeout (default)
 ): AsyncGenerator<StreamEvent> {
   let streamIterator: AsyncIterator<any> | null = null;
   let hasTimedOut = false;
-  let lastEventTime = Date.now();
 
   // Create a timeout checker
   const timeoutId = setTimeout(() => {
@@ -89,14 +89,20 @@ export async function* streamChatResponse(
     // Get the assistant ID (cached after first call)
     const assistantId = await getAssistantId();
     
+    // Build full message history: previous messages + new user message
+    const allMessages = [
+      ...conversationHistory,
+      { role: "user" as const, content: message }
+    ];
+    
     const stream = langgraphClient.runs.stream(
       threadId,
       assistantId,
       {
         input: {
-          messages: [{ role: "user", content: message }],
+          messages: allMessages,
         },
-        streamMode: ["values", "custom"], // ✅ Listen to both state updates and custom streaming
+        streamMode: ["values", "custom"] as any,
       }
     );
 
@@ -108,7 +114,6 @@ export async function* streamChatResponse(
         throw new Error(`Request timeout: The response took longer than ${timeoutMs / 1000} seconds. Please try again or simplify your question.`);
       }
 
-      lastEventTime = Date.now();
       const result = await streamIterator.next();
       if (result.done) {
         break;
@@ -123,7 +128,7 @@ export async function* streamChatResponse(
 export async function getThreadHistory(threadId: string): Promise<ChatMessage[]> {
   try {
     const state = await langgraphClient.threads.getState(threadId);
-    return state.values.messages || [];
+    return (state.values as any).messages || [];
   } catch (error) {
     console.error("Error getting thread history:", error);
     return [];
