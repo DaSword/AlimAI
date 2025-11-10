@@ -38,6 +38,7 @@ export default function ChatPage() {
   const [streamingMessage, setStreamingMessage] = useState("");
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
   const [currentThreadIndex, setCurrentThreadIndex] = useState<number | null>(null);
+  const [threadInputs, setThreadInputs] = useState<Map<number, string>>(new Map());
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -48,6 +49,9 @@ export default function ChatPage() {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentThreadIndexRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messageThreadIndexRef = useRef<number | null>(null);
+  const streamingMessageRef = useRef<string>("");
 
   useEffect(() => {
     // Load chat history from localStorage
@@ -133,14 +137,33 @@ export default function ChatPage() {
   };
 
   const handleNewConversation = async () => {
+    // Save current draft before switching
+    if (currentThreadIndex !== null) {
+      setThreadInputs(prev => {
+        const newMap = new Map(prev);
+        newMap.set(currentThreadIndex, input);
+        return newMap;
+      });
+    }
+    
     // The current conversation is already auto-saved, so we just need to reset
     setMessages([]);
     setStreamingMessage("");
     setCurrentThreadIndex(null);
+    setInput(""); // Clear input for new thread
     await initializeThread();
   };
 
   const loadChat = (index: number) => {
+    // Save current draft before switching
+    if (currentThreadIndex !== null) {
+      setThreadInputs(prev => {
+        const newMap = new Map(prev);
+        newMap.set(currentThreadIndex, input);
+        return newMap;
+      });
+    }
+    
     const thread = chatThreads[index];
     if (thread) {
       setThreadId(thread.id);
@@ -148,7 +171,62 @@ export default function ChatPage() {
       setCurrentThreadIndex(index);
       setStreamingMessage(""); // Clear any streaming from other threads
       setIsLoading(false); // Stop loading state if switching during a stream
+      
+      // Restore draft for this thread
+      setInput(threadInputs.get(index) || "");
     }
+  };
+
+  const handleCancelGeneration = async () => {
+    // Call backend to cancel streaming generation
+    try {
+      const LANGGRAPH_URL = import.meta.env.VITE_LANGGRAPH_URL || "http://localhost:8123";
+      await fetch(`${LANGGRAPH_URL}/api/admin/streaming/cancel`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.warn("Failed to cancel on backend:", error);
+    }
+    
+    // Save the partial response if we have any
+    const partialResponse = streamingMessageRef.current;
+    if (partialResponse && partialResponse.trim()) {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: partialResponse,
+        timestamp: new Date(),
+      };
+
+      // Save to the correct thread
+      const threadIndex = messageThreadIndexRef.current;
+      if (threadIndex !== null) {
+        setChatThreads(prev => {
+          const updated = [...prev];
+          if (updated[threadIndex]) {
+            updated[threadIndex] = {
+              ...updated[threadIndex],
+              messages: [...updated[threadIndex].messages, assistantMessage]
+            };
+          }
+          return updated;
+        });
+      }
+
+      // Only update visible messages if still viewing the same thread
+      if (currentThreadIndexRef.current === threadIndex) {
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    }
+    
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    setIsLoading(false);
+    setStreamingMessage("");
+    streamingMessageRef.current = "";
   };
 
   const handleSendMessage = async () => {
@@ -164,12 +242,27 @@ export default function ChatPage() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput("");
+    // Clear draft for current thread since we're sending
+    if (currentThreadIndex !== null) {
+      setThreadInputs(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(currentThreadIndex);
+        return newMap;
+      });
+    }
     setIsLoading(true);
     setStreamingMessage("");
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Capture the thread index and ID at the START of the message
     let messageThreadIndex = currentThreadIndex;
     const messageThreadId = threadId;
+    
+    // Store in ref for cancellation handler access
+    messageThreadIndexRef.current = messageThreadIndex;
 
     // Create/save thread immediately on first user message
     if (currentThreadIndex === null && messages.length === 0) {
@@ -184,6 +277,7 @@ export default function ChatPage() {
       setChatThreads(prev => [newThread, ...prev]);
       setCurrentThreadIndex(0); // Set to the newly created thread
       messageThreadIndex = 0; // Capture the new index
+      messageThreadIndexRef.current = 0; // Update ref as well
     } else if (currentThreadIndex !== null) {
       // Update existing thread with the new user message immediately
       setChatThreads(prev => {
@@ -209,7 +303,7 @@ export default function ChatPage() {
         content: msg.content
       }));
 
-      for await (const event of streamChatResponse(messageThreadId, userMessage.content, conversationHistory)) {
+      for await (const event of streamChatResponse(messageThreadId, userMessage.content, conversationHistory, 180000, abortController.signal)) {
         // Handle different event types from LangGraph
         
         // Custom streaming events (token-by-token from get_stream_writer)
@@ -217,6 +311,8 @@ export default function ChatPage() {
           if (event.data?.token) {
             // Append token to accumulated content
             accumulatedContent += event.data.token;
+            // Update ref for cancellation handler
+            streamingMessageRef.current = accumulatedContent;
             // Only update streaming display if still viewing the same thread (use ref for real-time value)
             if (currentThreadIndexRef.current === messageThreadIndex) {
               setStreamingMessage(accumulatedContent);
@@ -224,6 +320,8 @@ export default function ChatPage() {
           } else if (event.data?.response) {
             // Fallback: use full response if available
             accumulatedContent = event.data.response;
+            // Update ref for cancellation handler
+            streamingMessageRef.current = accumulatedContent;
             if (currentThreadIndexRef.current === messageThreadIndex) {
               setStreamingMessage(accumulatedContent);
             }
@@ -237,6 +335,8 @@ export default function ChatPage() {
             const lastMessage = event.data.messages[event.data.messages.length - 1];
             if (lastMessage?.role === "assistant") {
               accumulatedContent = lastMessage.content;
+              // Update ref for cancellation handler
+              streamingMessageRef.current = accumulatedContent;
               if (currentThreadIndexRef.current === messageThreadIndex) {
                 setStreamingMessage(accumulatedContent);
               }
@@ -278,8 +378,16 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, assistantMessage]);
       }
       setStreamingMessage("");
+      streamingMessageRef.current = "";
     } catch (error: any) {
       console.error("Error sending message:", error);
+      
+      // Check if it was cancelled by user
+      if (error?.message === "CANCELLED" || abortController.signal.aborted) {
+        // Don't show error message for cancellation
+        setStreamingMessage("");
+        return; // Exit early, don't add error message
+      }
       
       // Provide more specific error message
       let errorContent = "Sorry, I encountered an error. Please try again.";
@@ -316,8 +424,11 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, errorMessage]);
       }
       setStreamingMessage("");
+      streamingMessageRef.current = "";
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
+      messageThreadIndexRef.current = null;
     }
   };
 
@@ -390,6 +501,7 @@ export default function ChatPage() {
           value={input}
           onChange={setInput}
           onSend={handleSendMessage}
+          onCancel={handleCancelGeneration}
           isLoading={isLoading}
           disabled={!threadId}
         />

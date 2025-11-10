@@ -11,11 +11,24 @@ This module contains node functions that process the RAG state:
 """
 
 from typing import Dict, Any, List
-import json
-import re
+import threading
 
 from llama_index.core.llms import ChatMessage, MessageRole
 from langgraph.config import get_stream_writer
+
+# Global cancellation flag for streaming
+_streaming_cancelled = threading.Event()
+_streaming_lock = threading.Lock()
+
+def cancel_streaming():
+    """Cancel any ongoing streaming generation."""
+    global _streaming_cancelled
+    _streaming_cancelled.set()
+
+def reset_streaming():
+    """Reset the streaming cancellation flag."""
+    global _streaming_cancelled
+    _streaming_cancelled.clear()
 
 from backend.core.models import (
     RAGState,
@@ -569,15 +582,44 @@ Please provide a helpful response based on general Islamic knowledge, but includ
         if enable_streaming and writer:
             # Streaming mode: emit tokens as they're generated
             accumulated_response = ""
-            response_stream = llm.stream_chat(chat_messages)
+            response_stream = None
             
-            for chunk in response_stream:
-                if chunk.delta:
-                    accumulated_response += chunk.delta
-                    # Stream token via writer
-                    writer({"token": chunk.delta, "response": accumulated_response})
+            # Reset cancellation flag for this request
+            reset_streaming()
             
-            response_text = accumulated_response
+            try:
+                response_stream = llm.stream_chat(chat_messages)
+                
+                for chunk in response_stream:
+                    # Check cancellation FIRST before processing chunk
+                    if _streaming_cancelled.is_set():
+                        raise InterruptedError("Streaming cancelled by user")
+                    
+                    if chunk.delta:
+                        accumulated_response += chunk.delta
+                        try:
+                            # Stream token via writer
+                            writer({"token": chunk.delta, "response": accumulated_response})
+                        except Exception as write_error:
+                            # Client disconnected or stream writer failed
+                            print(f"⚠️ Stream writer failed (likely client disconnect): {write_error}")
+                            print("⚠️ Setting cancellation flag...")
+                            cancel_streaming()
+                            raise InterruptedError("Client disconnected")
+            except Exception as e:
+                print(f"⚠️ Stream error: {e}")
+            finally:
+                # Aggressively close the stream to stop LLM generation
+                if response_stream is not None:
+                    try:
+                        # Close the generator
+                        if hasattr(response_stream, 'close'):
+                            response_stream.close()
+                        # Force cleanup
+                        del response_stream
+                    except Exception as cleanup_error:
+                        print(f"⚠️ Error during stream cleanup: {cleanup_error}")
+                response_text = accumulated_response if accumulated_response else "Generation cancelled."
         else:
             # Non-streaming mode: wait for complete response
             response = llm.chat(chat_messages)
@@ -662,15 +704,45 @@ def generate_conversational_response_node(state: Dict[str, Any], config: Dict[st
         if enable_streaming and writer:
             # Streaming mode: emit tokens as they're generated
             accumulated_response = ""
-            response_stream = llm.stream_chat(chat_messages)
+            response_stream = None
             
-            for chunk in response_stream:
-                if chunk.delta:
-                    accumulated_response += chunk.delta
-                    # Stream token via writer
-                    writer({"token": chunk.delta, "response": accumulated_response})
+            # Reset cancellation flag for this request
+            reset_streaming()
             
-            response_text = accumulated_response
+            try:
+                response_stream = llm.stream_chat(chat_messages)
+                
+                for chunk in response_stream:
+                    # Check cancellation FIRST before processing chunk
+                    if _streaming_cancelled.is_set():
+                        raise InterruptedError("Streaming cancelled by user")
+                    
+                    if chunk.delta:
+                        accumulated_response += chunk.delta
+                        try:
+                            # Stream token via writer
+                            writer({"token": chunk.delta, "response": accumulated_response})
+                        except Exception as write_error:
+                            # Client disconnected or stream writer failed
+                            print(f"⚠️ Conversational stream writer failed (likely client disconnect): {write_error}")
+                            print("⚠️ Setting cancellation flag...")
+                            cancel_streaming()
+                            raise InterruptedError("Client disconnected")
+            except Exception as e:
+                print(f"⚠️ Conversational stream error: {e}")
+            finally:
+                # Aggressively close the stream to stop LLM generation
+                if response_stream is not None:
+                    try:
+                        # Close the generator
+                        if hasattr(response_stream, 'close'):
+                            response_stream.close()
+                            print("⚠️ Conversational stream generator closed")
+                        # Force cleanup
+                        del response_stream
+                    except Exception as cleanup_error:
+                        print(f"⚠️ Error during conversational stream cleanup: {cleanup_error}")
+                response_text = accumulated_response if accumulated_response else "Generation cancelled."
         else:
             # Non-streaming mode: wait for complete response
             response = llm.chat(chat_messages)

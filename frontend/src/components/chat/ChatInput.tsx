@@ -1,11 +1,12 @@
 import { useRef, useEffect } from "react";
-import { Loader2, ArrowUp } from "lucide-react";
+import { Loader2, ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  onCancel?: () => void;
   isLoading: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -15,6 +16,7 @@ export function ChatInput({
   value,
   onChange,
   onSend,
+  onCancel,
   isLoading,
   disabled = false,
   placeholder = "Ask me anything about Islam..."
@@ -24,7 +26,9 @@ export function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (!isLoading) {
+        onSend();
+      }
     }
   };
 
@@ -56,13 +60,14 @@ export function ChatInput({
             style={{ minHeight: '48px' }}
           />
           <Button
-            onClick={onSend}
-            disabled={isLoading || !value.trim() || disabled}
+            onClick={isLoading ? onCancel : onSend}
+            disabled={!isLoading && (!value.trim() || disabled)}
             size="sm"
             className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg islamic-gradient shadow-md hover:shadow-lg transition-all"
+            title={isLoading ? "Stop generation" : "Send message"}
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Square className="w-3.5 h-3.5 fill-current animate-pulse" />
             ) : (
               <ArrowUp className="w-4 h-4" />
             )}

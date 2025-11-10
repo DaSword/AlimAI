@@ -74,16 +74,38 @@ export async function* streamChatResponse(
   threadId: string,
   message: string,
   conversationHistory: ChatMessage[] = [],
-  timeoutMs: number = 180000 // 3 minutes timeout (default)
+  timeoutMs: number = 180000, // 3 minutes timeout (default)
+  signal?: AbortSignal
 ): AsyncGenerator<StreamEvent> {
   let streamIterator: AsyncIterator<any> | null = null;
   let hasTimedOut = false;
+  let isCancelled = false;
+  let runId: string | null = null;
 
   // Create a timeout checker
   const timeoutId = setTimeout(() => {
     hasTimedOut = true;
     console.warn(`Stream timeout after ${timeoutMs}ms without completion`);
   }, timeoutMs);
+
+  // Listen for abort signal
+  const abortHandler = async () => {
+    isCancelled = true;
+    
+    // Try to cancel the run on the backend
+    if (runId && threadId) {
+      try {
+        await langgraphClient.runs.cancel(threadId, runId);
+        console.log(`Cancelled run ${runId}`);
+      } catch (error) {
+        console.warn("Failed to cancel run:", error);
+      }
+    }
+  };
+  
+  if (signal) {
+    signal.addEventListener('abort', abortHandler);
+  }
 
   try {
     // Get the assistant ID (cached after first call)
@@ -109,6 +131,14 @@ export async function* streamChatResponse(
     streamIterator = stream[Symbol.asyncIterator]();
 
     while (true) {
+      // Check for cancellation
+      if (isCancelled || signal?.aborted) {
+        // Try to return the iterator to clean up
+        if (streamIterator.return) {
+          await streamIterator.return(undefined);
+        }
+      }
+
       // Check for timeout before each iteration
       if (hasTimedOut) {
         throw new Error(`Request timeout: The response took longer than ${timeoutMs / 1000} seconds. Please try again or simplify your question.`);
@@ -118,10 +148,20 @@ export async function* streamChatResponse(
       if (result.done) {
         break;
       }
-      yield result.value;
+      
+      // Capture run_id from metadata events
+      const event = result.value;
+      if (event.event === "metadata" && event.data?.run_id) {
+        runId = event.data.run_id;
+      }
+      
+      yield event;
     }
   } finally {
     clearTimeout(timeoutId);
+    if (signal) {
+      signal.removeEventListener('abort', abortHandler);
+    }
   }
 }
 

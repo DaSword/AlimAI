@@ -25,9 +25,29 @@ from .ingestion_api import (
     cancel_task as cancel_ingestion_task,
     list_available_files,
 )
+from backend.rag.rag_nodes import cancel_streaming
 
 # Create admin router
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# ============================================================================
+# Streaming Control Endpoints
+# ============================================================================
+
+@router.post("/streaming/cancel")
+async def cancel_streaming_generation() -> Dict[str, Any]:
+    """
+    Cancel any ongoing streaming generation.
+    
+    Returns:
+        Success status
+    """
+    cancel_streaming()
+    return {
+        "success": True,
+        "message": "Streaming generation cancelled"
+    }
 
 
 # ============================================================================
