@@ -14,6 +14,8 @@ interface ChatSidebarProps {
   onClose: () => void;
   onNewConversation: () => void;
   chatThreads: ChatThread[];
+  currentThreadIndex: number | null;
+  onLoadChat: (index: number) => void;
   fullName: string;
   onOpenSettings: () => void;
   onOpenAdmin: () => void;
@@ -25,6 +27,8 @@ export function ChatSidebar({
   onClose,
   onNewConversation,
   chatThreads,
+  currentThreadIndex,
+  onLoadChat,
   fullName,
   onOpenSettings,
   onOpenAdmin,
@@ -87,10 +91,14 @@ export function ChatSidebar({
 
       <div className="flex-1 overflow-y-auto px-3 min-w-64">
         <div className="text-xs text-muted-foreground mb-2 px-2 whitespace-nowrap">Recent</div>
-        {chatThreads.map((thread) => (
+        {chatThreads.map((thread, index) => (
           <button
             key={thread.id}
-            className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-sm mb-1 truncate overflow-hidden whitespace-nowrap text-ellipsis"
+            onClick={() => onLoadChat(index)}
+            className={cn(
+              "w-full text-left px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-sm mb-1 truncate overflow-hidden whitespace-nowrap text-ellipsis",
+              currentThreadIndex === index && "bg-muted font-medium"
+            )}
           >
             {thread.title}
           </button>

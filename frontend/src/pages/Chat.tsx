@@ -27,6 +27,7 @@ interface ChatThread {
   id: string;
   title: string;
   timestamp: Date;
+  messages: Message[];
 }
 
 export default function ChatPage() {
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
+  const [currentThreadIndex, setCurrentThreadIndex] = useState<number | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -45,8 +47,29 @@ export default function ChatPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentThreadIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Load chat history from localStorage
+    const savedThreads = localStorage.getItem('chatThreads');
+    if (savedThreads) {
+      try {
+        const parsed = JSON.parse(savedThreads);
+        // Convert timestamp strings back to Date objects
+        const threads = parsed.map((thread: any) => ({
+          ...thread,
+          timestamp: new Date(thread.timestamp),
+          messages: thread.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+        }));
+        setChatThreads(threads);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    }
+    
     // Create a new thread on mount
     initializeThread();
   }, []);
@@ -57,11 +80,23 @@ export default function ChatPage() {
   }, [messages, streamingMessage]);
 
   useEffect(() => {
+    // Keep ref in sync with state
+    currentThreadIndexRef.current = currentThreadIndex;
+  }, [currentThreadIndex]);
+
+  useEffect(() => {
     // Load saved theme preference
     const savedTheme = localStorage.getItem('theme') as ThemeMode || 'dark';
     setThemeMode(savedTheme);
     applyTheme(savedTheme);
   }, []);
+
+  // Save chatThreads to localStorage whenever it changes
+  useEffect(() => {
+    if (chatThreads.length > 0) {
+      localStorage.setItem('chatThreads', JSON.stringify(chatThreads));
+    }
+  }, [chatThreads]);
 
   const applyTheme = (mode: ThemeMode) => {
     const root = document.documentElement;
@@ -98,20 +133,22 @@ export default function ChatPage() {
   };
 
   const handleNewConversation = async () => {
-    // Save current thread if it has messages
-    if (messages.length > 0 && threadId) {
-      const firstUserMessage = messages.find(m => m.role === "user");
-      const title = firstUserMessage?.content.slice(0, 50) || "New Chat";
-      setChatThreads(prev => [{
-        id: threadId,
-        title,
-        timestamp: new Date()
-      }, ...prev]);
-    }
-    
+    // The current conversation is already auto-saved, so we just need to reset
     setMessages([]);
     setStreamingMessage("");
+    setCurrentThreadIndex(null);
     await initializeThread();
+  };
+
+  const loadChat = (index: number) => {
+    const thread = chatThreads[index];
+    if (thread) {
+      setThreadId(thread.id);
+      setMessages(thread.messages);
+      setCurrentThreadIndex(index);
+      setStreamingMessage(""); // Clear any streaming from other threads
+      setIsLoading(false); // Stop loading state if switching during a stream
+    }
   };
 
   const handleSendMessage = async () => {
@@ -124,10 +161,42 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput("");
     setIsLoading(true);
     setStreamingMessage("");
+
+    // Capture the thread index and ID at the START of the message
+    let messageThreadIndex = currentThreadIndex;
+    const messageThreadId = threadId;
+
+    // Create/save thread immediately on first user message
+    if (currentThreadIndex === null && messages.length === 0) {
+      const title = userMessage.content.slice(0, 50) || "New Chat";
+      const newThread: ChatThread = {
+        id: threadId,
+        title,
+        timestamp: new Date(),
+        messages: updatedMessages
+      };
+      
+      setChatThreads(prev => [newThread, ...prev]);
+      setCurrentThreadIndex(0); // Set to the newly created thread
+      messageThreadIndex = 0; // Capture the new index
+    } else if (currentThreadIndex !== null) {
+      // Update existing thread with the new user message immediately
+      setChatThreads(prev => {
+        const updated = [...prev];
+        if (updated[currentThreadIndex]) {
+          updated[currentThreadIndex] = {
+            ...updated[currentThreadIndex],
+            messages: updatedMessages
+          };
+        }
+        return updated;
+      });
+    }
 
     try {
       let accumulatedContent = "";
@@ -140,7 +209,7 @@ export default function ChatPage() {
         content: msg.content
       }));
 
-      for await (const event of streamChatResponse(threadId, userMessage.content, conversationHistory)) {
+      for await (const event of streamChatResponse(messageThreadId, userMessage.content, conversationHistory)) {
         // Handle different event types from LangGraph
         
         // Custom streaming events (token-by-token from get_stream_writer)
@@ -148,11 +217,16 @@ export default function ChatPage() {
           if (event.data?.token) {
             // Append token to accumulated content
             accumulatedContent += event.data.token;
-            setStreamingMessage(accumulatedContent);
+            // Only update streaming display if still viewing the same thread (use ref for real-time value)
+            if (currentThreadIndexRef.current === messageThreadIndex) {
+              setStreamingMessage(accumulatedContent);
+            }
           } else if (event.data?.response) {
             // Fallback: use full response if available
             accumulatedContent = event.data.response;
-            setStreamingMessage(accumulatedContent);
+            if (currentThreadIndexRef.current === messageThreadIndex) {
+              setStreamingMessage(accumulatedContent);
+            }
           }
         }
         
@@ -163,7 +237,9 @@ export default function ChatPage() {
             const lastMessage = event.data.messages[event.data.messages.length - 1];
             if (lastMessage?.role === "assistant") {
               accumulatedContent = lastMessage.content;
-              setStreamingMessage(accumulatedContent);
+              if (currentThreadIndexRef.current === messageThreadIndex) {
+                setStreamingMessage(accumulatedContent);
+              }
             }
           }
 
@@ -183,7 +259,24 @@ export default function ChatPage() {
         sources: sources.length > 0 ? sources : undefined,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Save to the correct thread, even if user switched views
+      if (messageThreadIndex !== null) {
+        setChatThreads(prev => {
+          const updated = [...prev];
+          if (updated[messageThreadIndex]) {
+            updated[messageThreadIndex] = {
+              ...updated[messageThreadIndex],
+              messages: [...updated[messageThreadIndex].messages, assistantMessage]
+            };
+          }
+          return updated;
+        });
+      }
+
+      // Only update visible messages if still viewing the same thread (use ref for real-time value)
+      if (currentThreadIndexRef.current === messageThreadIndex) {
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
       setStreamingMessage("");
     } catch (error: any) {
       console.error("Error sending message:", error);
@@ -203,7 +296,25 @@ export default function ChatPage() {
         content: errorContent,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+
+      // Save error to the correct thread
+      if (messageThreadIndex !== null) {
+        setChatThreads(prev => {
+          const updated = [...prev];
+          if (updated[messageThreadIndex]) {
+            updated[messageThreadIndex] = {
+              ...updated[messageThreadIndex],
+              messages: [...updated[messageThreadIndex].messages, errorMessage]
+            };
+          }
+          return updated;
+        });
+      }
+
+      // Only update visible messages if still viewing the same thread (use ref for real-time value)
+      if (currentThreadIndexRef.current === messageThreadIndex) {
+        setMessages((prev) => [...prev, errorMessage]);
+      }
       setStreamingMessage("");
     } finally {
       setIsLoading(false);
@@ -218,6 +329,8 @@ export default function ChatPage() {
         onClose={() => setIsSidebarOpen(false)}
         onNewConversation={handleNewConversation}
         chatThreads={chatThreads}
+        currentThreadIndex={currentThreadIndex}
+        onLoadChat={loadChat}
         fullName={fullName}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenAdmin={() => setIsAdminModalOpen(true)}
