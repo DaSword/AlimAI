@@ -12,8 +12,7 @@ Time estimates:
     - Ollama backend (slower): ~8-15 hours
 """
 
-from pathlib import Path
-from backend.core.config import Config, config
+from backend.core.config import config
 from backend.llama.llama_config import configure_llama_index, check_ollama_connection, get_embed_model
 from backend.vectordb.qdrant_manager import QdrantManager
 from backend.ingestion.ingestion import IngestionManager

@@ -1,7 +1,5 @@
 # Islamic Chatbot RAG Implementation Plan
 
-**Note:** This project now uses **LlamaIndex** for indexing/retrieval and **LangGraph** for RAG orchestration. See `RAG-plan.md` for detailed implementation architecture, patterns, and code examples.
-
 ---
 
 ## Phase 1: Book Selection & Prioritization
@@ -161,15 +159,15 @@ alimai/
 **Key Organizational Principles:**
 
 1. **LangGraph Server:** Native API server with built-in streaming, state persistence, and thread management
-2. **Modular Architecture:** Python packages with `__init__.py` files for proper module organization
+2. **Modular Architecture** 
 3. **Import Style:** `from backend.core.config import Config`, `from backend.vectordb.qdrant_manager import QdrantManager`
 4. **Separation of Concerns:** Frontend (React), Backend (LangGraph Server), RAG (LlamaIndex + LangGraph), Data (JSON files), Infrastructure (Docker)
 5. **LlamaIndex Integration:** All indexing, retrieval, and query operations use LlamaIndex
 6. **LangGraph Orchestration:** Complex RAG workflow managed by LangGraph StateGraph with native API endpoints
-7. **Ollama Integration:** All models (embedding, reranker, chat) hosted through Ollama, accessed via LlamaIndex
+7. **LM Studio Integration:** All models (embedding, reranker, chat) hosted through LM Studio, accessed via LlamaIndex
 8. **Admin UI:** All ingestion, migration, and management functionality accessible through React admin panel (no standalone scripts)
-9. **Existing Files Migration (Stage 4 Complete):**
-   - `embeddings_manager.py` → `backend/llama/embeddings_service.py` (wrapper around LlamaIndex OllamaEmbedding)
+9. **Existing Files Migration:**
+   - `embeddings_manager.py` → `backend/llama/embeddings_service.py` (wrapper around LlamaIndex)
    - `qdrant_manager.py` → `backend/vectordb/qdrant_manager.py` (updated for LlamaIndex integration)
    - `quran_chunker.py` → `backend/ingestion/chunking.py` (converted to LlamaIndex NodeParsers)
    - All parsers in `backend/ingestion/parsers.py` (QuranNodeParser, HadithNodeParser, etc.)
@@ -739,506 +737,44 @@ query_engine = RetrieverQueryEngine(retriever=retriever)
 **Total Lines:** ~2,900+ lines across 12 files  
 **Test Coverage:** 7/7 tests passing
 
-## Phase 6: Frontend Development ✅ COMPLETED
-
-**Date Completed:** November 7, 2025
-
-### 6.1 React Application Setup ✅
-
-**Initialized Vite + React + TypeScript:**
-
-```bash
-npm create vite@latest frontend -- --template react-ts
-cd frontend
-npm install react-router-dom @langchain/langgraph-sdk axios lucide-react
-npm install clsx class-variance-authority tailwind-merge
-npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
-```
-
-### 6.2 Core Components ✅
-
-**frontend/src/App.tsx** - Main application with routing:
-
-- ✅ `/` - Chat interface (default route)
-- ✅ Theme system initialization (dark/light/system)
-- ✅ BrowserRouter setup
-
-**frontend/src/pages/Chat.tsx** - Main chat interface (450+ lines):
-
-- ✅ Message history display with conversation threads
-- ✅ Chat input box with auto-resize
-- ✅ Source citations with book, reference, and text excerpts
-- ✅ Real-time streaming via LangGraph SDK
-- ✅ Thread management (new conversation, continue thread)
-- ✅ Collapsible sidebar with thread list
-- ✅ Islamic decorative elements (Bismillah, geometric patterns)
-- ✅ Settings and admin modals
-- ✅ Theme switching (dark/light/system)
-- ✅ User profile management
-
-**frontend/src/api/client.ts** - Type-safe API client:
-
-- ✅ LangGraph SDK client for chat operations:
-  ```typescript
-  import { Client } from "@langchain/langgraph-sdk";
-  
-  const client = new Client({
-    apiUrl: import.meta.env.VITE_LANGGRAPH_URL || "http://localhost:8123"
-  });
-  
-  // Create thread
-  export async function createThread(): Promise<string> {
-    const thread = await client.threads.create();
-    return thread.thread_id;
-  }
-  
-  // Stream chat responses
-  export async function* streamChatResponse(
-    threadId: string, 
-    message: string
-  ): AsyncGenerator<StreamEvent> {
-    const stream = client.runs.stream(
-      threadId,
-      "rag_assistant",
-      { input: { messages: [{ role: "user", content: message }] } }
-    );
-    
-    for await (const event of stream) {
-      yield event;
-    }
-  }
-  ```
-- ✅ Axios instance for admin operations:
-  ```typescript
-  const adminClient = axios.create({
-    baseURL: `${LANGGRAPH_URL}/api/admin`,
-    headers: { "Content-Type": "application/json" }
-  });
-  ```
-- ✅ Complete TypeScript interfaces for all API types
-
-### 6.3 Chat Interface Components ✅
-
-**ChatSidebar.tsx:**
-- ✅ Collapsible sidebar with smooth animations
-- ✅ Logo and branding
-- ✅ New chat button
-- ✅ Recent conversations list
-- ✅ User menu with settings/admin/logout
-
-**ChatInput.tsx:**
-- ✅ Auto-resizing textarea (grows to 200px)
-- ✅ Enter to send, Shift+Enter for newline
-- ✅ Send button with loading spinner
-- ✅ Islamic gradient styling
-
-**MessageBubble.tsx:**
-- ✅ Distinct styling for user vs assistant
-- ✅ Source citations with expandable details
-- ✅ Streaming indicator (pulsing cursor)
-- ✅ Avatar icons
-
-**WelcomeScreen.tsx:**
-- ✅ Bismillah with gradient effect
-- ✅ Animated logo with glow
-- ✅ Quick action cards (Quran, Hadith, Prayer, Fiqh)
-- ✅ Islamic ornamental decorations
-
-**IslamicDecorations.tsx:**
-- ✅ SVG Islamic book icon
-- ✅ Corner ornaments (4 positions)
-- ✅ Horizontal dividers with wave patterns
-- ✅ Theme-aware coloring
-
-**SettingsModal.tsx:**
-- ✅ User profile editing (name, email)
-- ✅ Theme selection (Light/System/Dark)
-- ✅ Visual theme preview cards
-- ✅ Inline editing with save/cancel
-
-**AdminModal.tsx:**
-- ✅ Tabbed interface (Ingestion/Collections/Models)
-- ✅ Modal backdrop and close button
-- ✅ Delegates to specialized admin components
-
-### 6.4 Admin UI Components ✅
-
-**IngestionPanel.tsx:**
-- ✅ File upload with JSON type restriction
-- ✅ Source type dropdown (Quran/Hadith/Tafsir/Fiqh/Seerah/Aqidah)
-- ✅ Upload progress tracking
-- ✅ Visual status indicators (uploading/completed/error)
-- ✅ File format guidelines display
-
-**CollectionManager.tsx:**
-- ✅ List all Qdrant collections
-- ✅ Collection stats (point count, vector count, vector size, distance metric)
-- ✅ Clear collection button (with confirmation)
-- ✅ Delete collection button (with confirmation)
-- ✅ Refresh button
-- ✅ Loading states during operations
-
-**ModelStatus.tsx:**
-- ✅ System health dashboard (Ollama/LM Studio/Qdrant/LangGraph)
-- ✅ Model list with name, size, loaded status
-- ✅ Pull model button for unloaded models
-- ✅ Service information panel with connection details
-- ✅ Health check indicators (green/red)
-
-### 6.5 UI Component Library ✅
-
-**components/ui/button.tsx:**
-- ✅ Variants: default, destructive, outline, secondary, ghost, link
-- ✅ Sizes: default, sm, lg, icon
-- ✅ Islamic emerald green primary color
-- ✅ Full TypeScript support
-
-**components/ui/card.tsx:**
-- ✅ Card, CardHeader, CardTitle, CardDescription
-- ✅ CardContent, CardFooter
-- ✅ Semantic component composition
-
-**components/ui/input.tsx:**
-- ✅ Text and file input support
-- ✅ Focus states with primary color ring
-- ✅ Disabled state styling
-
-**components/ui/textarea.tsx:**
-- ✅ Multi-line text input
-- ✅ Resizable (controlled by parent)
-- ✅ Consistent focus states
-
-**components/ui/tabs.tsx:**
-- ✅ Tabbed interface with context-based state
-- ✅ Active tab highlighting
-- ✅ Keyboard navigation support
-
-### 6.6 Design System ✅
-
-**Islamic Color Palette:**
-- ✅ Primary (Emerald): hsl(160 84% 39%) - Paradise/Jannah
-- ✅ Secondary (Gold): hsl(45 100% 51%) - Divine light
-- ✅ Accent (Teal): hsl(173 80% 40%) - Wisdom
-- ✅ Islamic Navy: Borders and structure
-
-**Typography:**
-- ✅ Inter (sans-serif) - UI elements
-- ✅ Amiri (serif) - Arabic text
-- ✅ Scheherazade New - Decorative Arabic
-- ✅ Playfair Display - Elegant headings
-
-**Theming:**
-- ✅ CSS custom properties for runtime switching
-- ✅ Dark/Light/System modes
-- ✅ Persistent theme storage (localStorage)
-- ✅ Smooth transitions between themes
-
-**Islamic Patterns:**
-- ✅ Geometric background patterns
-- ✅ Radial gradients for texture
-- ✅ Islamic card borders with gold accent
-- ✅ Decorative corner elements
-
-### 6.7 TypeScript Integration ✅
-
-- ✅ Full type safety throughout codebase
-- ✅ Interfaces for all API requests/responses
-- ✅ Component prop types
-- ✅ Event handler types
-- ✅ Type-safe environment variables
-
-### 6.8 Build Configuration ✅
-
-**Vite Configuration:**
-- ✅ React plugin for JSX transformation
-- ✅ Path alias `@` for `./src`
-- ✅ Dependency optimization
-
-**TypeScript Configuration:**
-- ✅ `tsconfig.json` - Base configuration
-- ✅ `tsconfig.app.json` - App-specific settings
-- ✅ `tsconfig.node.json` - Node/Vite settings
-- ✅ Path mapping for clean imports
-
-**Tailwind Configuration:**
-- ✅ Custom Islamic color palette
-- ✅ Custom utilities (islamic-pattern, islamic-gradient)
-- ✅ CSS variable integration
-- ✅ Font family configuration
-
-### Statistics
-
-- **Total Lines:** ~2,800+ lines of TypeScript/TSX
-- **Components:** 25+ components
-- **Pages:** 1 main page (Chat)
-- **UI Components:** 5 reusable primitives
-- **Admin Components:** 3 specialized panels
-- **Chat Components:** 8 interface elements
-- **API Integration:** Full type-safe client with streaming support
-
-## Phase 7: Implementation Steps
-
-**See `RAG-plan.md` for detailed implementation guide and code examples.**
-
-### Step 1: Install dependencies
-
-```bash
-# LlamaIndex core and integrations
-pip install llama-index-core
-pip install llama-index-vector-stores-qdrant
-pip install llama-index-embeddings-ollama
-pip install llama-index-llms-ollama
-
-# LangGraph and LangChain
-pip install langgraph
-pip install langchain-core
-pip install langchain-community
-pip install langchain-ollama
-```
-
-### Step 2: Backend restructuring ✅ COMPLETE (Stage 4)
-
-1. Create modular `backend/` structure with Python packages:
-   ```bash
-   backend/
-   ├── core/          # Configuration, models, utilities ✅
-   ├── llama/         # LlamaIndex multi-backend integration ✅
-   ├── vectordb/      # Vector database operations ✅
-   ├── ingestion/     # Data pipeline with streaming ✅
-   ├── rag/           # RAG workflow (Stage 5)
-   ├── api/           # Server & endpoints (Stage 5)
-   └── tests/         # Test suite ✅
-   ```
-
-2. **Core modules** (`backend/core/`) ✅:
-   - `config.py` - Multi-backend configuration management
-   - `models.py` - Pydantic schemas (state, API, documents)
-   - `utils.py` - Utilities & logging
-
-3. **LlamaIndex multi-backend integration** (`backend/llama/`) ✅:
-   - `llama_config.py` - Dynamic backend configuration (HuggingFace/Ollama/LM Studio)
-   - `embeddings_service.py` - Multi-backend embedding wrapper (3 backends)
-   - `llm_service.py` - Multi-backend LLM wrapper (2 backends) with timeout handling
-   - `reranker_service.py` - Backend-aware LLM reranking
-
-4. **Vector database** (`backend/vectordb/`) ✅:
-   - `qdrant_manager.py` - Qdrant + LlamaIndex VectorStore integration with enhanced schema
-
-5. **Ingestion pipeline** (`backend/ingestion/`) ✅:
-   - `parsers.py` - LlamaIndex NodeParsers (Quran + architecture for others)
-   - `chunking.py` - Text chunking utilities
-   - `ingestion.py` - Streaming LlamaIndex IngestionPipeline (batch processing)
-   - `migrate_data.py` - Data migration utility
-
-6. **Ingestion & Search Scripts** ✅:
-   - `ingest_quran.py` - Full Quran ingestion with auto vector size detection
-   - `search_quran.py` - Interactive search with backend awareness
-
-7. **RAG workflow** (`backend/rag/`) ✅ **COMPLETED Stage 5**:
-   - ✅ `rag_graph.py` (300 lines) - LangGraph StateGraph definition
-   - ✅ `rag_nodes.py` (410 lines) - Individual workflow nodes
-   - ✅ `retrieval.py` (566 lines) - LlamaIndex query engine wrapper
-   - ✅ `context_formatter.py` (502 lines) - Context formatting
-   - ✅ `prompts.py` (467 lines) - System prompts and templates
-
-8. **API & Server** (`backend/api/`) ✅ **COMPLETED Stage 5**:
-   - ✅ `server.py` (195 lines) - LangGraph Server setup
-   - ✅ `admin/ingestion_api.py` (177 lines) - Ingestion endpoints
-   - ✅ `admin/collection_api.py` (284 lines) - Collection management
-   - ✅ `admin/models_api.py` (228 lines) - Model status endpoints
-   - ✅ `langgraph.json` - LangGraph Server configuration (root level)
-   - ✅ `test_rag_workflow.py` (176 lines) - Comprehensive test script
-
-9. **Tests** (`backend/tests/`) ✅:
-   - `test_stage4.py` - Stage 4 ingestion tests
-   - `test_imports.py` - Import verification
-
-### Step 3: Update docker-compose.yml
-
-- Enable Ollama service
-- Configure model pulling on startup
-- Add LangGraph Server service
-- Configure networking between services (Ollama, Qdrant, LangGraph Server)
-- Set up volumes for state persistence
-- Set environment variables
-
-### Step 4: Frontend development
-
-1. Initialize Vite React app in `frontend/`
-2. Set up routing and layout
-3. Install LangGraph SDK (`@langchain/langgraph-sdk`)
-4. Build chat interface components with streaming support
-5. Build admin panel components
-6. Connect to LangGraph Server via SDK for chat
-7. Connect to admin API via axios for management operations
-
-### Step 5: Data model migration & ingestion ✅ COMPLETE (Stage 4)
-
-- ✅ Updated payload schema in `backend/vectordb/qdrant_manager.py` (new fields OPTIONAL and additive)
-- ✅ Ensured compatibility with LlamaIndex Document metadata structure
-- ✅ Added filtered search methods by source/madhab/authenticity
-- ✅ Created migration utility (`backend/ingestion/migrate_data.py`) to enrich existing Quran entries:
-  - Add `book_title`: "The Noble Quran"
-  - Add `book_title_arabic`: "القرآن الكريم"
-  - Add `author`: "Allah (Revealed)"
-  - Add `topic_tags`: Extract from metadata or generate based on content
-  - Set `source_type` to standardized value: "quran"
-- ✅ Migration only updates metadata, NO re-embedding or re-chunking needed
-- ✅ Created streaming ingestion pipeline (`backend/ingestion/ingestion.py`):
-  - Batch-wise processing to prevent memory exhaustion
-  - Progress tracking with visual feedback
-  - Support for all embedding backends
-  - Auto-detects embedding dimensions
-- ✅ Created ingestion scripts:
-  - `ingest_quran.py` - Full Quran ingestion with backend flexibility
-  - `search_quran.py` - Search with backend awareness
-- ✅ Multi-backend configuration system:
-  - Environment-based backend selection
-  - Separate embedding and LLM backends
-  - Proper timeout handling for all backends
-
-### Step 6: Ingest Tier 1 texts
-
-Via admin UI using LlamaIndex IngestionPipeline:
-
-- Process and upload Sahih al-Bukhari and Sahih Muslim
-- Process and upload chosen Tafsir
-- Process and upload Riyad al-Salihin and Seerah
-
-### Step 7: Test and iterate
-
-- Test LangGraph Server endpoints with diverse question types
-- Test conversation threading and state persistence
-- Test streaming responses
-- Evaluate LangGraph workflow execution and state transitions
-- Use LangGraph Studio for workflow debugging and visualization
-- Evaluate answer quality and source grounding
-- Adjust retrieval weights and filters in `backend/retrieval.py`
-- Refine LangGraph routing logic in `backend/rag_graph.py`
-- Refine prompts in `backend/prompts.py`
-- Monitor LlamaIndex query performance
-
-### Step 8: Ingest Tier 2 & 3 (gradual expansion)
-
-Via admin UI:
-
-- Add remaining Hadith collections
-- Add Fiqh texts from all madhahib
-- Add methodology and specialized texts
-
-## Key Design Decisions
-
-1. **LlamaIndex for RAG foundation:** Robust indexing, retrieval, and query engine with production-ready features
-2. **Multi-backend flexibility:** Support for 3 embedding backends (HuggingFace/Ollama/LM Studio) and 2 LLM backends (Ollama/LM Studio)
-3. **HuggingFace for performance:** Fast local embeddings with true batching, GPU acceleration when available
-4. **Streaming ingestion:** Batch-wise processing prevents memory exhaustion, enables resumable operations
-5. **LangGraph Server for orchestration:** Native API server with state machine workflow, built-in streaming, and persistence - no Flask needed
-6. **Modular architecture:** Python packages with `__init__.py` files - clear separation of concerns (core, llama, vectordb, ingestion, rag, api, tests)
-7. **Environment-based configuration:** Easy backend switching via `.env` file without code changes
-8. **Admin UI over scripts:** All management functionality (ingestion, migration, collection management) accessible through interfaces
-9. **LangGraph native endpoints:** Automatic API generation from graph definition with built-in streaming
-10. **Metadata-rich chunks:** Every chunk carries full provenance for citation (LlamaIndex Documents/Nodes)
-11. **Authenticity weighting:** Sahih sources rank higher than Daif in retrieval (handled by LangGraph context ranking)
-12. **Madhab balance:** Fiqh queries fetch from all 4 schools automatically (LangGraph conditional routing)
-13. **LLM as synthesizer:** LLM doesn't invent, only synthesizes retrieved sources
-14. **Progressive ingestion:** Start with Tier 1, expand to Tier 2/3 based on coverage gaps
-15. **Arabic + English:** Maintain both for authenticity and accessibility
-16. **Workflow transparency:** LangGraph state machine makes RAG logic explicit and debuggable
-17. **Built-in state management:** LangGraph checkpointing handles conversation threads natively
-18. **LangGraph Studio:** Visual debugging and workflow inspection out of the box
-19. **Proper timeout handling:** Backend-specific timeout configuration prevents premature failures
-20. **Auto-dimension detection:** Embedding dimensions automatically detected for any model
-21. **Hybrid vector + graph:** Combines semantic search with explicit relationship traversal (Stage 10)
-22. **Graph-lite approach:** Store relationships in Qdrant payload, no separate graph database needed
-23. **Bidirectional linking:** Maintain forward and backward relationships (verse ↔ tafsir, hadith ↔ fiqh)
-24. **Relationship extraction:** Parsers automatically extract graph edges during ingestion
-25. **Flexible graph traversal:** Support 1-hop, 2-hop, and path-finding for connected knowledge
-
-## Backend Restructuring (Completed)
-
-As of Stage 4, the backend has been restructured into a modular architecture with proper Python packages:
-
-### Structure Transformation
-
-**From:** Flat structure with mixed concerns
-**To:** Modular packages with clear separation
-
-### New Import Patterns
-
-```python
-# Core functionality
-from backend.core.config import Config
-from backend.core.models import SourceType, QdrantPayload, create_qdrant_payload
-from backend.core.utils import setup_logging, ProgressTracker
-
-# LlamaIndex/Ollama integration
-from backend.llama.llama_config import configure_llama_index, get_embed_model, get_llm
-from backend.llama.embeddings_service import EmbeddingsService
-from backend.llama.llm_service import LLMService
-from backend.llama.reranker_service import RerankerService
-
-# Vector database
-from backend.vectordb.qdrant_manager import QdrantManager
-
-# Ingestion pipeline
-from backend.ingestion.parsers import QuranNodeParser, HadithNodeParser, TafsirNodeParser
-from backend.ingestion.chunking import parse_tafsir_html, chunk_plain_text
-from backend.ingestion.ingestion import IngestionManager, ingest_quran
-from backend.ingestion.migrate_data import DataMigration
-
-# RAG components (Stage 5)
-from backend.rag.rag_graph import create_rag_graph
-from backend.rag.retrieval import create_retriever
-from backend.rag.prompts import SYSTEM_PROMPT
-
-# API/Server (Stage 5)
-from backend.api.server import create_app
-```
-
-### Benefits Achieved
-
-1. **Clear Separation:** Each package has a single, well-defined responsibility
-2. **Easier Navigation:** Intuitive file organization makes code easy to find
-3. **Better Imports:** Type hints and autocomplete work more effectively
-4. **Scalable:** Easy to add new components without affecting existing code
-5. **Testable:** Isolated packages are easier to test independently
-6. **Stage 5 Ready:** Structure prepared for RAG and API components
-
-### Verification
-
-All imports verified and tested:
-```bash
-# Fast import verification (2 seconds)
-python -m backend.tests.test_imports
-
-# Results: 5/5 tests passed
-✓ Core imports successful
-✓ Llama imports successful
-✓ VectorDB imports successful
-✓ Ingestion imports successful
-✓ Config paths correct
-```
-
-## Expected Outcomes
-
-- **Production-ready RAG system:** LlamaIndex + LangGraph Server provide battle-tested infrastructure
-- **Modern full-stack application:** React frontend + LangGraph Server + LlamaIndex + Ollama + Qdrant
-- **Simplified architecture:** No Flask/FastAPI needed - LangGraph Server handles all API requirements
-- **Native streaming:** Built-in streaming support via LangGraph Server with Server-Sent Events
-- **User-friendly admin panel:** Upload and ingest texts via LlamaIndex pipelines, manage collections, monitor models
-- **Comprehensive knowledge base:** Covering 15-20 foundational texts across Quran, Hadith, Tafsir, Fiqh, Seerah
-- **Intelligent retrieval:** Balances authenticity, relevance, and madhab diversity with LlamaIndex metadata filtering
-- **Sophisticated workflow:** LangGraph state machine orchestrates query classification, expansion, retrieval, ranking, and generation
-- **Persistent conversations:** Thread-based conversation management with automatic checkpointing
-- **Islam-first responses:** Ground general questions in Islamic teachings using RAG
-- **Transparent citations:** Every claim backed by specific source references (Surah:Verse, Hadith number, etc.)
-- **Scalable architecture:** Easy to add new texts, update models, extend workflow nodes
-- **Self-hosted:** All models run locally through Ollama - no external API dependencies
-- **Debuggable workflows:** LangGraph Studio visualization and state inspection for troubleshooting
-- **Type-safe state management:** Pydantic schemas for all state transitions
-
-### With Stage 10 (Knowledge Graph Enhancement):
+### Key Architecture Features
+
+1. **Multi-Backend Flexibility:**
+   - 3 embedding backends: HuggingFace (fast local), Ollama (API), LM Studio (OpenAI-compatible)
+   - 2 LLM backends: Ollama, LM Studio
+   - Dynamic selection via environment variables
+   - Proper timeout handling for all backends
+
+2. **Intelligent RAG Workflow:**
+   - Query complexity analysis (simple vs. complex)
+   - Query classification (fiqh, aqidah, tafsir, hadith, general)
+   - Query expansion for better retrieval
+   - Source-specific retrieval strategies
+   - Authenticity-based ranking (Quran 1.0 → Seerah 0.60)
+   - Madhab-aware fiqh responses
+   - Streaming generation with cancellation support
+
+3. **Production-Ready Ingestion:**
+   - Streaming batch processing (prevents memory exhaustion)
+   - Progress tracking with callbacks
+   - Auto-detection of embedding dimensions
+   - Custom NodeParsers for each Islamic text type
+   - Background task management with single-job queue
+
+4. **Comprehensive Admin API:**
+   - Collection management (list, stats, delete, clear, export, search)
+   - Ingestion management (upload, track, cancel)
+   - Model status and health checks (Qdrant, Ollama, LM Studio)
+   - Task tracking for long-running operations
+
+5. **LangGraph Server Integration:**
+   - Automatic API endpoints from graph definition
+   - Built-in streaming via Server-Sent Events
+   - Thread-based conversation management
+   - State persistence with checkpointing
+   - No Flask/FastAPI needed for chat endpoints
+
+### With Knowledge Graph Enhancement:
 
 - **Hybrid retrieval:** Combines semantic vector search with explicit relationship traversal
 - **Complete context:** Get ALL related content (e.g., all tafsir for a verse), not just top-k similar

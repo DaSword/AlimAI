@@ -6,7 +6,7 @@ This document breaks down the full RAG pipeline implementation into actionable s
 
 ---
 
-<!-- ## Stage 1: Environment Setup & Infrastructure  -  COMPLETED
+## Stage 1: Environment Setup & Infrastructure  -  COMPLETED
 
 **Goal:** Establish foundational infrastructure for local development and deployment.
 
@@ -35,11 +35,11 @@ This document breaks down the full RAG pipeline implementation into actionable s
 - [ ] Python virtual environment activates and installs all dependencies
 
 ### Dependencies
-None - this is the foundation for all other stages. -->
+None - this is the foundation for all other stages.
 
 ---
 
-<!-- ## Stage 2: Backend Core Structure  --  COMPLETED
+## Stage 2: Backend Core Structure  --  COMPLETED
 
 **Goal:** Create organized backend structure and migrate existing code.
 
@@ -66,11 +66,11 @@ None - this is the foundation for all other stages. -->
 - [ ] All modules have consistent import patterns
 
 ### Dependencies
-- Stage 1 must be complete -->
+- Stage 1 must be complete
 
 ---
 
-<!-- ## Stage 3: llama.cpp Integration & Model Setup ✅ COMPLETED
+## Stage 3: llama.cpp Integration & Model Setup ✅ COMPLETED
 
 **Goal:** Set up native llama.cpp servers for embeddings, chat, and reranking with local GGUF models.
 
@@ -143,11 +143,11 @@ None - this is the foundation for all other stages. -->
 - OpenAI-compatible APIs enable easy integration with LlamaIndex
 - Manager script provides production-ready service management
 - Chat model supports special commands: `/no_think` (fast), `/think` (reasoning)
-- All implementations follow LlamaIndex official documentation -->
+- All implementations follow LlamaIndex official documentation
 
 ---
 
-<!-- ## Stage 4: Enhanced Data Schema & Ingestion Pipeline (LlamaIndex) ✅ COMPLETED
+## Stage 4: Enhanced Data Schema & Ingestion Pipeline (LlamaIndex) ✅ COMPLETED
 
 **Goal:** Design universal data schema and build LlamaIndex-based ingestion pipeline for all text types.
 
@@ -241,7 +241,7 @@ None - this is the foundation for all other stages. -->
 
 ### Dependencies
 - Stage 2 (backend structure) ✅
-- Stage 3 (Ollama embeddings service) ✅ -->
+- Stage 3 (Ollama embeddings service) ✅
 
 ---
 
@@ -250,8 +250,6 @@ None - this is the foundation for all other stages. -->
 **Goal:** Build intelligent retrieval system with Islam-first context formatting using LangGraph Server.
 
 **See `RAG-plan.md` for detailed LangGraph workflow architecture and state machine design.**
-
-**See `STAGE5_COMPLETE.md` for comprehensive completion report.**
 
 ### Tasks
 
@@ -506,44 +504,66 @@ None - this is the foundation for all other stages. -->
 
 **Goal:** Acquire and ingest the most essential Islamic texts (Tier 1 from plan).
 
+**Current Status:** Infrastructure ready, awaiting data acquisition
+
 ### Tasks
 
 #### Non-Technical
-- [ ] **Acquire Sahih al-Bukhari** (already completed - in data/)
+- [ ] **Acquire Sahih al-Bukhari**
   - Download from sunnah.com API or similar source
   - Verify JSON format with book/chapter/hadith structure
   - Ensure Arabic + English text included
+  - Required fields: `hadith_number`, `book_name`, `chapter_name`, `narrator_chain`, `authenticity_grade`, `arabic_text`, `english_text`
 - [ ] **Acquire Sahih Muslim**
   - Download from sunnah.com API or similar source
   - Verify format consistency with Bukhari
+  - Same field requirements as Bukhari
 - [ ] **Acquire Tafsir Ibn Kathir**
   - Download from tanzil.net, islamicstudies.info, or similar
   - Verify verse-by-verse commentary structure
   - Ensure Arabic + English available
+  - Required fields: `verse_key`, `surah_number`, `verse_number`, `tafsir_text_arabic`, `tafsir_text_english`, `author`
 - [ ] **Acquire Riyad al-Salihin**
   - Download from hadithcollection.com or similar
   - Verify chapter/hadith organization
+  - Same format as other hadith collections
 - [ ] **Acquire Al-Sirah al-Nabawiyyah (Ibn Hisham)**
   - Download from islamicstudies.info or similar
   - Verify chronological event structure
+  - Required fields: `event_name`, `year_hijri`, `chronological_order`, `event_text`, `participants`
 
 #### Technical
 - [ ] Ingest Sahih al-Bukhari via admin panel
+  - Use `source_type: hadith`
+  - Verify `HadithNodeParser` processes correctly
+  - Expected ~7,000+ points
 - [ ] Ingest Sahih Muslim via admin panel
+  - Use `source_type: hadith`
+  - Expected ~7,000+ points
 - [ ] Ingest Tafsir Ibn Kathir via admin panel
+  - Use `source_type: tafsir`
+  - Verify `TafsirNodeParser` processes correctly
+  - Expected ~6,000+ commentary chunks
 - [ ] Ingest Riyad al-Salihin via admin panel
+  - Use `source_type: hadith`
+  - Expected ~2,000+ points
 - [ ] Ingest Ibn Hisham Seerah via admin panel
+  - Use `source_type: seerah`
+  - Verify `SeerahNodeParser` processes correctly
+  - Expected ~500+ event chunks
 - [ ] Verify collection counts and sample queries
+- [ ] Test cross-source queries (e.g., "What is charity?" should retrieve Quran verses + relevant hadiths)
 
 ### Deliverables
 - All Tier 1 texts downloaded and stored in `data/` directories
-- All Tier 1 texts ingested into Qdrant
-- Minimum 10,000+ points across all collections
+- All Tier 1 texts ingested into Qdrant collection
+- Minimum 30,000+ points across all source types
+- Successfully tested multi-source retrieval
 
 ### Acceptance Criteria
 - [ ] All 5 Tier 1 texts successfully downloaded in JSON format
-- [ ] Each text ingested without errors
-- [ ] Qdrant collections show correct point counts:
+- [ ] Each text ingested without errors via admin panel
+- [ ] Qdrant collection shows correct point counts by source type:
   - Quran: ~6,236 verses (already done)
   - Sahih al-Bukhari: ~7,000+ hadiths
   - Sahih Muslim: ~7,000+ hadiths
@@ -551,11 +571,66 @@ None - this is the foundation for all other stages. -->
   - Riyad al-Salihin: ~2,000+ hadiths
   - Ibn Hisham Seerah: ~500+ event chunks
 - [ ] Sample queries return results from multiple source types
-- [ ] Metadata fields populated correctly for each source type
+- [ ] Metadata fields populated correctly per universal schema
+- [ ] Filters work correctly (e.g., `source_type="hadith"`, `authenticity_grade="sahih"`)
+- [ ] Authenticity ranking works (Quran results appear before hadith for same similarity)
+- [ ] Madhab-aware retrieval ready (once fiqh texts ingested)
+
+### Data Format Examples
+
+**Hadith (Bukhari/Muslim/Riyad):**
+```json
+{
+  "hadith_number": 1,
+  "book_name": "Book of Revelation",
+  "chapter_name": "How the Divine Inspiration started",
+  "narrator_chain": "Umar ibn al-Khattab → Ali → ...",
+  "authenticity_grade": "sahih",
+  "arabic_text": "...",
+  "english_text": "Actions are according to intentions...",
+  "book_title": "Sahih al-Bukhari",
+  "author": "Muhammad ibn Isma'il al-Bukhari"
+}
+```
+
+**Tafsir:**
+```json
+{
+  "verse_key": "2:183",
+  "surah_number": 2,
+  "verse_number": 183,
+  "tafsir_text_arabic": "...",
+  "tafsir_text_english": "...",
+  "tafsir_source": "ibn_kathir",
+  "book_title": "Tafsir Ibn Kathir",
+  "author": "Ismail ibn Umar ibn Kathir"
+}
+```
+
+**Seerah:**
+```json
+{
+  "event_name": "Migration to Madinah",
+  "year_hijri": 1,
+  "chronological_order": 15,
+  "event_text": "...",
+  "participants": ["Prophet Muhammad", "Abu Bakr"],
+  "book_title": "Al-Sirah al-Nabawiyyah",
+  "author": "Ibn Hisham"
+}
+```
 
 ### Dependencies
-- Stage 4 (ingestion pipeline complete)
-- Stage 6 (admin panel available for ingestion)
+- ✅ Stage 4 (ingestion pipeline complete)
+- ✅ Stage 5 (RAG system complete)
+- ✅ Stage 6 (admin panel available for ingestion)
+
+### Implementation Notes
+- Use HuggingFace embedding backend for fastest ingestion
+- Batch size: 100 documents per batch (configurable)
+- Progress tracking via admin panel with real-time updates
+- Task tracker ensures only one ingestion runs at a time
+- All NodeParsers already implemented and ready to use
 
 ---
 
