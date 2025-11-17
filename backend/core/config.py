@@ -42,6 +42,7 @@ class Config:
     OLLAMA_MAX_TOKENS: int = int(os.getenv("OLLAMA_MAX_TOKENS", "1000"))
     OLLAMA_REQUEST_TIMEOUT: int = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "100"))
     OLLAMA_EMBEDDING_BATCH_SIZE: int = int(os.getenv("OLLAMA_EMBEDDING_BATCH_SIZE", "5"))
+    OLLAMA_TOP_P: float = float(os.getenv("OLLAMA_TOP_P", "0.9"))
     
     # LM Studio Configuration
     LMSTUDIO_URL: str = os.getenv("LMSTUDIO_URL", "http://localhost:1234/v1")
@@ -51,6 +52,7 @@ class Config:
     LMSTUDIO_RERANKER_MODEL: Optional[str] = os.getenv("LMSTUDIO_RERANKER_MODEL", "hermes-2-pro-llama-3-8b")
     LMSTUDIO_MAX_TOKENS: int = int(os.getenv("LMSTUDIO_MAX_TOKENS", "1000"))
     LMSTUDIO_REQUEST_TIMEOUT: int = int(os.getenv("LMSTUDIO_REQUEST_TIMEOUT", "1000"))
+    LMSTUDIO_TOP_P: float = float(os.getenv("LMSTUDIO_TOP_P", "0.9"))
     
     # Vector Configuration
     VECTOR_SIZE: int = int(os.getenv("VECTOR_SIZE", "768"))  # embeddinggemma default

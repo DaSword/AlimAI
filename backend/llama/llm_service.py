@@ -56,6 +56,7 @@ class LLMService:
         llm_backend: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
+        top_p: Optional[float] = None,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None
     ):
@@ -66,6 +67,7 @@ class LLMService:
             llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
             model: LLM model name (defaults to config based on backend)
             temperature: Sampling temperature (0.0 to 1.0)
+            top_p: Nucleus sampling parameter (0.0 to 1.0, defaults to config)
             max_tokens: Maximum tokens to generate
             system_prompt: Default system prompt for conversations
         """
@@ -75,9 +77,11 @@ class LLMService:
         if self.llm_backend == "lmstudio":
             self.model_name = model or config.LMSTUDIO_CHAT_MODEL
             self.max_tokens = max_tokens or config.LMSTUDIO_MAX_TOKENS
+            self.top_p = top_p if top_p is not None else config.LMSTUDIO_TOP_P
         else:  # ollama
             self.model_name = model or config.OLLAMA_CHAT_MODEL
             self.max_tokens = max_tokens or config.OLLAMA_MAX_TOKENS
+            self.top_p = top_p if top_p is not None else config.OLLAMA_TOP_P
         
         self.temperature = temperature
         self.system_prompt = system_prompt
@@ -87,6 +91,7 @@ class LLMService:
         logger.info(f"  Backend: {self.llm_backend}")
         logger.info(f"  Model: {self.model_name}")
         logger.info(f"  Temperature: {self.temperature}")
+        logger.info(f"  Top P: {self.top_p}")
         logger.info(f"  Max Tokens: {self.max_tokens or 'unlimited'}")
     
     def get_llm(self):
@@ -118,6 +123,7 @@ class LLMService:
                     "model": self.model_name,
                     "base_url": config.OLLAMA_URL,
                     "temperature": self.temperature,
+                    "top_p": self.top_p,
                     "request_timeout": config.OLLAMA_REQUEST_TIMEOUT,
                     "context_window": self.max_tokens or config.OLLAMA_MAX_TOKENS,
                 }
@@ -137,6 +143,7 @@ class LLMService:
                     "model_name": self.model_name,
                     "base_url": config.LMSTUDIO_URL,
                     "temperature": self.temperature,
+                    "top_p": self.top_p,
                     "request_timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
                     "timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
                 }
