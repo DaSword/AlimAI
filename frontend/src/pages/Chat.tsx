@@ -350,6 +350,14 @@ export default function ChatPage() {
         }
       }
 
+      // Check if the request was cancelled - if so, don't save the message
+      // because handleCancelGeneration already saved the partial response
+      if (abortController.signal.aborted) {
+        setStreamingMessage("");
+        streamingMessageRef.current = "";
+        return; // Exit early, message already saved by cancel handler
+      }
+
       // Add the complete message
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
