@@ -55,10 +55,13 @@ class LLMService:
         self,
         llm_backend: Optional[str] = None,
         model: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = 0.6,
         top_p: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        repeat_penalty: Optional[float] = None,
+        frequency_penalty: Optional[float] = None,
+        presence_penalty: Optional[float] = None
     ):
         """
         Initialize LLMService.
@@ -66,22 +69,33 @@ class LLMService:
         Args:
             llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
             model: LLM model name (defaults to config based on backend)
-            temperature: Sampling temperature (0.0 to 1.0)
+            temperature: Sampling temperature (0.0 to 1.0, lower for more factual)
             top_p: Nucleus sampling parameter (0.0 to 1.0, defaults to config)
             max_tokens: Maximum tokens to generate
             system_prompt: Default system prompt for conversations
+            repeat_penalty: Ollama repeat penalty (1.0 = no penalty, >1.0 = penalize repeats)
+            frequency_penalty: LM Studio frequency penalty (0.0 to 2.0)
+            presence_penalty: LM Studio presence penalty (0.0 to 2.0)
         """
         self.llm_backend = llm_backend or config.LLM_BACKEND
         
-        # Set model name based on backend
+        # Set model name and parameters based on backend
         if self.llm_backend == "lmstudio":
             self.model_name = model or config.LMSTUDIO_CHAT_MODEL
             self.max_tokens = max_tokens or config.LMSTUDIO_MAX_TOKENS
             self.top_p = top_p if top_p is not None else config.LMSTUDIO_TOP_P
+            # LM Studio uses OpenAI-style penalties
+            self.frequency_penalty = frequency_penalty if frequency_penalty is not None else 0.7
+            self.presence_penalty = presence_penalty if presence_penalty is not None else 0.6
+            self.repeat_penalty = None
         else:  # ollama
             self.model_name = model or config.OLLAMA_CHAT_MODEL
             self.max_tokens = max_tokens or config.OLLAMA_MAX_TOKENS
             self.top_p = top_p if top_p is not None else config.OLLAMA_TOP_P
+            # Ollama uses repeat_penalty
+            self.repeat_penalty = repeat_penalty if repeat_penalty is not None else 1.2
+            self.frequency_penalty = None
+            self.presence_penalty = None
         
         self.temperature = temperature
         self.system_prompt = system_prompt
@@ -93,6 +107,11 @@ class LLMService:
         logger.info(f"  Temperature: {self.temperature}")
         logger.info(f"  Top P: {self.top_p}")
         logger.info(f"  Max Tokens: {self.max_tokens or 'unlimited'}")
+        if self.llm_backend == "ollama":
+            logger.info(f"  Repeat Penalty: {self.repeat_penalty}")
+        else:
+            logger.info(f"  Frequency Penalty: {self.frequency_penalty}")
+            logger.info(f"  Presence Penalty: {self.presence_penalty}")
     
     def get_llm(self):
         """
@@ -128,6 +147,17 @@ class LLMService:
                     "context_window": self.max_tokens or config.OLLAMA_MAX_TOKENS,
                 }
                 
+                # Add Ollama-specific options for repetition control
+                additional_kwargs = {}
+                if self.repeat_penalty is not None:
+                    additional_kwargs["repeat_penalty"] = self.repeat_penalty
+                    additional_kwargs["repeat_last_n"] = 64  # Look back 64 tokens for repetition
+                if self.max_tokens:
+                    additional_kwargs["num_predict"] = self.max_tokens  # Max tokens to generate
+                
+                if additional_kwargs:
+                    kwargs["additional_kwargs"] = additional_kwargs
+                
                 self.llm = Ollama(**kwargs)
                 logger.info("✓ Ollama LLM loaded successfully")
                 return True
@@ -147,6 +177,14 @@ class LLMService:
                     "request_timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
                     "timeout": config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
                 }
+                
+                # Add OpenAI-style penalties for LM Studio
+                if self.frequency_penalty is not None:
+                    kwargs["frequency_penalty"] = self.frequency_penalty
+                if self.presence_penalty is not None:
+                    kwargs["presence_penalty"] = self.presence_penalty
+                if self.max_tokens:
+                    kwargs["max_tokens"] = self.max_tokens
                 
                 self.llm = LMStudio(**kwargs)
                 logger.info("✓ LM Studio LLM loaded successfully")
@@ -389,8 +427,8 @@ class LLMService:
 
 def main():
     """Main function to test the LLM service."""
-    # Initialize service
-    service = LLMService(temperature=0.7)
+    # Initialize service with repetition control
+    service = LLMService(temperature=0.6)
     
     # Check model availability
     if not service.check_model_availability():

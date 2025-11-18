@@ -124,12 +124,18 @@ def configure_llama_index(
             llm_model = llm_model or config.OLLAMA_CHAT_MODEL
             logger.info(f"  LLM Model: {llm_model} (Ollama)")
             
+            # Configure with repetition control to prevent looping
             llm = Ollama(
                 model=llm_model,
                 base_url=ollama_url,
+                temperature=0.6,  # Lower temperature for more factual responses
                 request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
+                additional_kwargs={
+                    "repeat_penalty": 1.2,  # Penalize repetitive content
+                    "repeat_last_n": 64,    # Look back 64 tokens
+                }
             )
-            logger.info("✓ Using Ollama LLM")
+            logger.info("✓ Using Ollama LLM (with repetition control)")
             
         elif llm_backend == "lmstudio":
             from llama_index.llms.lmstudio import LMStudio
@@ -138,10 +144,13 @@ def configure_llama_index(
             logger.info(f"  LLM Model: {llm_model} (LM Studio)")
             logger.info(f"  LM Studio Request Timeout: {config.LMSTUDIO_REQUEST_TIMEOUT}s")
             
+            # Configure with penalties to prevent looping
             llm = LMStudio(
                 model_name=llm_model,
                 base_url=lmstudio_url,
-                temperature=0.7,
+                temperature=0.6,  # Lower temperature for more factual responses
+                frequency_penalty=0.7,  # Penalize frequent tokens
+                presence_penalty=0.6,   # Penalize repeated tokens
                 request_timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
                 timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
             )
@@ -240,20 +249,26 @@ def get_llm(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     temperature: float = 0.6,
+    repeat_penalty: float = 1.2,
+    frequency_penalty: float = 0.7,
+    presence_penalty: float = 0.6,
     **kwargs
 ):
     """
-    Get a configured LLM instance based on backend.
+    Get a configured LLM instance based on backend with repetition control.
     
     Args:
         llm_backend: LLM backend ('ollama' or 'lmstudio', defaults to config)
         model: LLM model name (defaults to config based on backend)
         base_url: Service URL (defaults to config based on backend)
-        temperature: Sampling temperature (0.0 to 1.0)
+        temperature: Sampling temperature (0.0 to 1.0, lower for more factual)
+        repeat_penalty: Ollama repeat penalty (1.0 = no penalty, >1.0 = penalize)
+        frequency_penalty: LM Studio frequency penalty (0.0 to 2.0)
+        presence_penalty: LM Studio presence penalty (0.0 to 2.0)
         **kwargs: Additional arguments for the LLM
         
     Returns:
-        Configured LLM instance (Ollama or LMStudio)
+        Configured LLM instance (Ollama or LMStudio) with repetition control
     """
     llm_backend = llm_backend or config.LLM_BACKEND
     
@@ -263,11 +278,19 @@ def get_llm(
         model = model or config.OLLAMA_CHAT_MODEL
         base_url = base_url or config.OLLAMA_URL
         
+        # Build additional_kwargs for Ollama-specific options
+        additional_kwargs = kwargs.pop("additional_kwargs", {})
+        additional_kwargs.update({
+            "repeat_penalty": repeat_penalty,
+            "repeat_last_n": 64,
+        })
+        
         return Ollama(
             model=model,
             base_url=base_url,
             temperature=temperature,
             request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
+            additional_kwargs=additional_kwargs,
             **kwargs
         )
     
@@ -281,6 +304,8 @@ def get_llm(
             model_name=model,
             base_url=base_url,
             temperature=temperature,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
             request_timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
             timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
             **kwargs
