@@ -181,8 +181,10 @@ RESPONSE_GENERATION_PROMPT = """Answer this question using the provided Islamic 
 4. Cite each source specifically (Surah:Verse, Hadith collection:number)
 5. Acknowledge scholarly differences when present
 6. Add practical guidance if relevant
+7. Be concise and avoid repeating the same information
 
-Use markdown formatting naturally - headings, bold for key terms, blockquotes for verses/hadith, and bullet points where helpful."""
+Use markdown formatting naturally - headings, bold for key terms, blockquotes for verses/hadith, and bullet points where helpful.
+"""
 
 FIQH_GENERATION_PROMPT = """Answer this fiqh question using the provided sources, showing madhahib perspectives when available.
 
@@ -201,9 +203,10 @@ FIQH_GENERATION_PROMPT = """Answer this fiqh question using the provided sources
 4. If madhahib agree, state consensus; if they differ, explain differences respectfully
 5. Provide practical application guidance
 6. Include specific citations
+7. Be concise and avoid repeating the same information
 
-Use markdown naturally for organization."""
-
+Use markdown naturally for organization.
+"""
 AQIDAH_GENERATION_PROMPT = """Answer this theological question using Quran and authentic Hadith.
 
 **Conversation History:**
@@ -221,8 +224,10 @@ AQIDAH_GENERATION_PROMPT = """Answer this theological question using Quran and a
 4. Note scholarly consensus among Sunni scholars
 5. Explain practical implications of this belief
 6. Include specific citations
+7. Be concise and avoid repeating the same information
 
-Use markdown naturally for organization."""
+Use markdown naturally for organization.
+"""
 
 # ============================================================================
 # Citation Formatting

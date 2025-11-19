@@ -55,7 +55,7 @@ class LLMService:
         self,
         llm_backend: Optional[str] = None,
         model: Optional[str] = None,
-        temperature: float = 0.6,
+        temperature: float = 0.5,
         top_p: Optional[float] = None,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
@@ -84,16 +84,16 @@ class LLMService:
             self.model_name = model or config.LMSTUDIO_CHAT_MODEL
             self.max_tokens = max_tokens or config.LMSTUDIO_MAX_TOKENS
             self.top_p = top_p if top_p is not None else config.LMSTUDIO_TOP_P
-            # LM Studio uses OpenAI-style penalties
-            self.frequency_penalty = frequency_penalty if frequency_penalty is not None else 0.7
-            self.presence_penalty = presence_penalty if presence_penalty is not None else 0.6
+            # LM Studio uses OpenAI-style penalties (strong penalties to prevent repetition)
+            self.frequency_penalty = frequency_penalty if frequency_penalty is not None else 1.5
+            self.presence_penalty = presence_penalty if presence_penalty is not None else 1.5
             self.repeat_penalty = None
         else:  # ollama
             self.model_name = model or config.OLLAMA_CHAT_MODEL
             self.max_tokens = max_tokens or config.OLLAMA_MAX_TOKENS
             self.top_p = top_p if top_p is not None else config.OLLAMA_TOP_P
-            # Ollama uses repeat_penalty
-            self.repeat_penalty = repeat_penalty if repeat_penalty is not None else 1.2
+            # Ollama uses repeat_penalty (strong penalty to prevent repetition)
+            self.repeat_penalty = repeat_penalty if repeat_penalty is not None else 1.5
             self.frequency_penalty = None
             self.presence_penalty = None
         
@@ -147,11 +147,11 @@ class LLMService:
                     "context_window": self.max_tokens or config.OLLAMA_MAX_TOKENS,
                 }
                 
-                # Add Ollama-specific options for repetition control
+                # Add Ollama-specific options for strong repetition control
                 additional_kwargs = {}
                 if self.repeat_penalty is not None:
                     additional_kwargs["repeat_penalty"] = self.repeat_penalty
-                    additional_kwargs["repeat_last_n"] = 64  # Look back 64 tokens for repetition
+                    additional_kwargs["repeat_last_n"] = 128  # Look back 128 tokens for repetition (increased from 64)
                 if self.max_tokens:
                     additional_kwargs["num_predict"] = self.max_tokens  # Max tokens to generate
                 
@@ -427,8 +427,8 @@ class LLMService:
 
 def main():
     """Main function to test the LLM service."""
-    # Initialize service with repetition control
-    service = LLMService(temperature=0.6)
+    # Initialize service with strong repetition control
+    service = LLMService(temperature=0.5)
     
     # Check model availability
     if not service.check_model_availability():

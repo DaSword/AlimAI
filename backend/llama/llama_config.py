@@ -124,15 +124,15 @@ def configure_llama_index(
             llm_model = llm_model or config.OLLAMA_CHAT_MODEL
             logger.info(f"  LLM Model: {llm_model} (Ollama)")
             
-            # Configure with repetition control to prevent looping
+            # Configure with strong repetition control to prevent looping
             llm = Ollama(
                 model=llm_model,
                 base_url=ollama_url,
-                temperature=0.6,  # Lower temperature for more factual responses
+                temperature=0.5,  # Lower temperature for more deterministic responses
                 request_timeout=config.OLLAMA_REQUEST_TIMEOUT,
                 additional_kwargs={
-                    "repeat_penalty": 1.2,  # Penalize repetitive content
-                    "repeat_last_n": 64,    # Look back 64 tokens
+                    "repeat_penalty": 1.5,  # Strong penalty for repetitive content (increased from 1.2)
+                    "repeat_last_n": 128,    # Look back 128 tokens (increased from 64)
                 }
             )
             logger.info("✓ Using Ollama LLM (with repetition control)")
@@ -144,13 +144,13 @@ def configure_llama_index(
             logger.info(f"  LLM Model: {llm_model} (LM Studio)")
             logger.info(f"  LM Studio Request Timeout: {config.LMSTUDIO_REQUEST_TIMEOUT}s")
             
-            # Configure with penalties to prevent looping
+            # Configure with strong penalties to prevent looping
             llm = LMStudio(
                 model_name=llm_model,
                 base_url=lmstudio_url,
-                temperature=0.6,  # Lower temperature for more factual responses
-                frequency_penalty=0.7,  # Penalize frequent tokens
-                presence_penalty=0.6,   # Penalize repeated tokens
+                temperature=0.5,  # Lower temperature for more deterministic responses
+                frequency_penalty=1.5,  # Strong penalty for frequent tokens (increased from 0.7)
+                presence_penalty=1.5,   # Strong penalty for repeated tokens (increased from 0.6)
                 request_timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Use request_timeout, not timeout!
                 timeout=config.LMSTUDIO_REQUEST_TIMEOUT,  # Set both for completeness
             )
@@ -248,10 +248,10 @@ def get_llm(
     llm_backend: Optional[str] = None,
     model: Optional[str] = None,
     base_url: Optional[str] = None,
-    temperature: float = 0.6,
-    repeat_penalty: float = 1.2,
-    frequency_penalty: float = 0.7,
-    presence_penalty: float = 0.6,
+    temperature: float = 0.5,
+    repeat_penalty: float = 1.5,
+    frequency_penalty: float = 1.5,
+    presence_penalty: float = 1.5,
     **kwargs
 ):
     """
@@ -282,7 +282,7 @@ def get_llm(
         additional_kwargs = kwargs.pop("additional_kwargs", {})
         additional_kwargs.update({
             "repeat_penalty": repeat_penalty,
-            "repeat_last_n": 64,
+            "repeat_last_n": 128,  # Look back further to detect repetition
         })
         
         return Ollama(
